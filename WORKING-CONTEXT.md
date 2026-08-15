@@ -1,6 +1,6 @@
 # Working Context
 
-Last updated: 2026-04-08
+Last updated: 2026-08-16
 
 ## Purpose
 
@@ -18,6 +18,7 @@ Public ECC plugin repo for agents, skills, commands, hooks, rules, install surfa
   - keep default branch green
   - continue issue-driven fixes from `main` now that the public PR backlog is at zero
   - continue ECC 2.0 control-plane and operator-surface buildout
+  - build out the native DeepSeek Harness Agent Engineering System (`.dsh/`, `scripts/dsh-*`, `tests/dsh/`); adapter foundation and live mount smoke are green, real-model acceptance remains
 
 ## Current Constraints
 
