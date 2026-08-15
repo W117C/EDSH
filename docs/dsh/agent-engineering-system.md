@@ -66,6 +66,9 @@ The default gate for this repository runs:
   after the tool schema was corrected to DSH's enforced JSON Schema subset.
 - `skill.list` for an `ecc` session returns `engineering-lifecycle` alongside
   the project's existing `.agents/skills` catalog.
+- Opt-in MCP rows also mount cleanly: `session.create` succeeds with
+  `ECC_DSH_MCP_CONTEXT7=1`, with `ECC_DSH_MCP_CODEGRAPH=1`, and with both
+  enabled together.
 
 ## Next phases
 
