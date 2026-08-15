@@ -160,6 +160,7 @@ hooks/           — Trigger-based automations
 rules/           — Always-follow guidelines (common + per-language)
 scripts/         — Cross-platform Node.js utilities
 mcp-configs/     — 14 MCP server configurations
+.dsh/            — Native DeepSeek Harness Agent Engineering System preset
 tests/           — Test suite
 ```
 

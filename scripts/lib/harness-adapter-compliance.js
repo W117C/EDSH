@@ -308,6 +308,46 @@ const ADAPTER_RECORDS = Object.freeze([
     source_docs: ['docs/architecture/cross-harness.md'],
   },
   {
+    id: 'dsh',
+    harness: 'DeepSeek Harness',
+    state: 'Adapter-backed',
+    supported_assets: [
+      'native agent preset (`.dsh/agent-presets/ecc`)',
+      'project-local and DSH-home skills',
+      'DSH plan mode, goal rounds, subagents, and dynamic workflows',
+      'repository-owned `ecc_verify` tool',
+      'opt-in MCP bridges for Context7 and CodeGraph',
+      '`/ecc-goal` command',
+    ],
+    unsupported_surfaces: [
+      'Full end-to-end model runs are not yet part of the repo test suite (they require DEEPSEEK_API_KEY)',
+      'DSH is a developer preview; upstream preset rows may change between releases',
+    ],
+    install_or_onramp: [
+      '`./install.sh --target dsh`',
+      '`npm run dsh:install -- --check` for a validate-only run',
+      'Select `ECC Engineering System` in the DSH preset picker, or set `agent-presets.default: ecc`',
+    ],
+    verification_commands: [
+      '`npm run dsh:validate`',
+      '`npm run dsh:install -- --check`',
+      '`npm run dsh:smoke` (requires the `dsh` binary on PATH)',
+      '`npm run harness:adapters -- --check`',
+    ],
+    risk_notes: [
+      'Pin and revalidate the preset against the installed DSH version after every upstream upgrade.',
+      'The default catalog keeps the Context7 and CodeGraph MCP rows disabled; enable them per deployment to avoid schema and token bloat.',
+    ],
+    last_verified_at: '2026-08-16',
+    owner: 'ECC maintainers',
+    source_docs: [
+      '.dsh/README.md',
+      '.dsh/agent-presets/ecc/agent.cordis.yml',
+      'scripts/dsh-install.js',
+      'scripts/dsh-validate-preset.js',
+    ],
+  },
+  {
     id: 'terminal-only',
     harness: 'Terminal-only',
     state: 'Native',

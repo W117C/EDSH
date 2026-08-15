@@ -1,6 +1,11 @@
 'use strict';
 
-const { validateInstallModuleIds, LOCALE_ALIAS_TO_COMPONENT_ID, listSupportedLocales } = require('../install-manifests');
+const {
+  hasTargetDefaultProfile,
+  listSupportedLocales,
+  LOCALE_ALIAS_TO_COMPONENT_ID,
+  validateInstallModuleIds,
+} = require('../install-manifests');
 
 const LEGACY_INSTALL_TARGETS = ['claude', 'claude-project', 'cursor', 'antigravity'];
 
@@ -124,7 +129,9 @@ function normalizeInstallRequest(options = {}) {
     || moduleIds.length > 0
     || requestedIncludeComponentIds.length > 0
     || excludeComponentIds.length > 0;
-  const usingManifestMode = hasManifestBaseSelection || excludeComponentIds.length > 0;
+  const usingManifestMode = hasManifestBaseSelection
+    || excludeComponentIds.length > 0
+    || (legacyLanguages.length === 0 && hasTargetDefaultProfile(target));
 
   if (hasNonLocaleManifestSelection && legacyLanguages.length > 0) {
     throw new Error(
@@ -132,7 +139,7 @@ function normalizeInstallRequest(options = {}) {
     );
   }
 
-  if (!options.help && !hasManifestBaseSelection && legacyLanguages.length === 0) {
+  if (!options.help && !hasManifestBaseSelection && legacyLanguages.length === 0 && !usingManifestMode) {
     throw new Error('No install profile, module IDs, included components, or legacy languages were provided');
   }
 

@@ -1092,6 +1092,24 @@
       "defaultInstall": false,
       "cost": "heavy",
       "stability": "stable"
+    },
+    {
+      "id": "dsh-preset",
+      "kind": "platform",
+      "description": "Native DeepSeek Harness preset: ECC Agent Engineering System composition, lifecycle protocol, verification tool, and loadable skills.",
+      "paths": [
+        ".dsh",
+        "scripts/dsh-install.js",
+        "scripts/dsh-validate-preset.js",
+        "scripts/dsh-smoke.js"
+      ],
+      "targets": [
+        "dsh"
+      ],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
     }
   ]
 }

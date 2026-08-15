@@ -4,7 +4,7 @@ const path = require('path');
 const { getInstallTargetAdapter, planInstallTargetScaffold } = require('./install-targets/registry');
 
 const DEFAULT_REPO_ROOT = path.join(__dirname, '../..');
-const SUPPORTED_INSTALL_TARGETS = ['claude', 'claude-project', 'cursor', 'antigravity', 'codex', 'gemini', 'opencode', 'codebuddy', 'joycode', 'qwen', 'zed', 'hermes', 'openclaw', 'kimi'];
+const SUPPORTED_INSTALL_TARGETS = ['claude', 'claude-project', 'cursor', 'antigravity', 'codex', 'gemini', 'opencode', 'codebuddy', 'joycode', 'qwen', 'zed', 'hermes', 'openclaw', 'kimi', 'dsh'];
 const COMPONENT_FAMILY_PREFIXES = {
   baseline: 'baseline:',
   language: 'lang:',
@@ -96,6 +96,9 @@ const LEGACY_COMPAT_BASE_MODULE_IDS_BY_TARGET = Object.freeze({
     'platform-configs',
     'workflow-quality',
   ],
+  dsh: [
+    'dsh-preset',
+  ],
 });
 const LEGACY_LANGUAGE_ALIAS_TO_CANONICAL = Object.freeze({
   c: 'c',
@@ -144,6 +147,7 @@ const LEGACY_LANGUAGE_RULE_NAMESPACES = Object.freeze({
 });
 const TARGET_DEFAULT_PROFILE_IDS = Object.freeze({
   opencode: 'opencode',
+  dsh: 'dsh',
 });
 const TARGET_DEFAULT_EXCLUSIONS = Object.freeze({
   opencode: [
@@ -464,6 +468,10 @@ function getTargetDefaultProfileId(target, manifests) {
   return profileId && manifests.profiles[profileId] ? profileId : null;
 }
 
+function hasTargetDefaultProfile(target, manifests = loadInstallManifests()) {
+  return getTargetDefaultProfileId(target, manifests) !== null;
+}
+
 function getTargetDefaultExclusions(target, manifests) {
   const exclusions = target ? TARGET_DEFAULT_EXCLUSIONS[target] : null;
   if (!Array.isArray(exclusions)) {
@@ -731,6 +739,7 @@ module.exports = {
   SUPPORTED_LOCALES,
   LOCALE_ALIAS_TO_COMPONENT_ID,
   getManifestPaths,
+  hasTargetDefaultProfile,
   loadInstallManifests,
   getInstallComponent,
   listInstallComponents,

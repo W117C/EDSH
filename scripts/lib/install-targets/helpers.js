@@ -14,6 +14,7 @@ const PLATFORM_SOURCE_PATH_OWNERS = Object.freeze({
   '.opencode': 'opencode',
   '.openclaw': 'openclaw',
   '.codebuddy': 'codebuddy',
+  '.dsh': 'dsh',
   '.qwen': 'qwen',
   '.zed': 'zed',
 });
@@ -263,6 +264,9 @@ function createInstallTargetAdapter(config) {
       return target === config.target || target === config.id;
     },
     resolveRoot(input = {}) {
+      if (typeof config.resolveRoot === 'function') {
+        return config.resolveRoot(input);
+      }
       const baseRoot = resolveBaseRoot(config.kind, input);
       return path.join(baseRoot, ...config.rootSegments);
     },
@@ -368,5 +372,6 @@ module.exports = {
   createNamespacedFlatRuleOperations,
   createRemappedOperation,
   isForeignPlatformPath,
+  listRelativeFiles,
   normalizeRelativePath,
 };

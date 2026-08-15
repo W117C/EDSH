@@ -226,6 +226,23 @@ const HARNESS_CAPABILITIES = deepFreeze([
     hooks: hooks('not-configured', false, 'ECC hooks are not configured by this adapter.'),
     aliases: ['open-claw'],
   },
+  {
+    id: 'dsh',
+    label: 'DeepSeek Harness',
+    targetIds: ['dsh'],
+    channel: 'native-preset',
+    installMode: 'native-preset',
+    guidedReady: false,
+    availability: 'advanced',
+    destination: '~/.dsh',
+    scopes: [scope('home', 'dsh', '~/.dsh')],
+    hooks: hooks(
+      'native-goal-loop',
+      true,
+      'DSH plan mode, goal rounds, subagents, workflows, and the ecc_verify gate enforce the lifecycle; Claude-style repo hooks are not executed by DSH.'
+    ),
+    aliases: ['deepseek-harness'],
+  },
 ]);
 
 const GUIDED_HARNESS_IDS = deepFreeze(

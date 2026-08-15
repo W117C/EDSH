@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "name": "adapters",
+      "command": "npm run harness:adapters -- --check",
+      "timeoutMs": 120000,
+      "required": true
+    },
+    {
+      "name": "unit",
+      "command": "node tests/run-all.js",
+      "timeoutMs": 600000,
+      "required": true
+    }
+  ]
+}

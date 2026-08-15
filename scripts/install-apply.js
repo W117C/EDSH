@@ -47,6 +47,7 @@ Targets:
   hermes       - Install shared rules/skills/commands into ~/.hermes/
   kimi         - Install Kimi Code project instructions, skills, and MCP config into ./.kimi-code/ (ECC hooks not configured)
   openclaw     - Install shared rules/skills/commands into ~/.openclaw/
+  dsh          - Install the native ECC Agent Engineering System preset and skills into ~/.dsh/
 
 Options:
   --profile <name>    Resolve and install a manifest profile

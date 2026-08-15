@@ -23,13 +23,14 @@ For the full-stack platform framing and product-integration loop, see
 
 | Surface | Shared Source | Harness Adapter | Current Status |
 |---------|---------------|-----------------|----------------|
-| Skills | `skills/*/SKILL.md` | Claude plugin, Codex plugin, `.agents/skills`, Cursor skill copies, OpenCode plugin/config | Supported with harness-specific packaging |
-| Rules and instructions | `rules/`, `AGENTS.md`, translated docs | Claude rules install, Codex `AGENTS.md`, Cursor rules, OpenCode instructions | Supported, but not identical across harnesses |
-| Hooks | `hooks/hooks.json`, `scripts/hooks/` | Claude native hooks, OpenCode plugin events, Cursor hook adapter | Hook-backed in Claude/OpenCode/Cursor; instruction-backed in Codex |
-| MCPs | `.mcp.json`, `mcp-configs/` | Native MCP config import per harness | Supported where the harness exposes MCP |
-| Commands | `commands/`, CLI scripts | Claude slash commands, compatibility shims, CLI entrypoints | Supported, but command semantics vary |
+| Skills | `skills/*/SKILL.md` | Claude plugin, Codex plugin, `.agents/skills`, Cursor skill copies, OpenCode plugin/config, DSH project/user skill roots | Supported with harness-specific packaging |
+| Rules and instructions | `rules/`, `AGENTS.md`, translated docs | Claude rules install, Codex `AGENTS.md`, Cursor rules, OpenCode instructions, DSH `agent-instructions` | Supported, but not identical across harnesses |
+| Hooks | `hooks/hooks.json`, `scripts/hooks/` | Claude native hooks, OpenCode plugin events, Cursor hook adapter; DSH uses plan mode, goal rounds, and the `ecc_verify` gate instead of Claude hook parity | Hook-backed in Claude/OpenCode/Cursor; native loop-backed in DSH; instruction-backed in Codex |
+| MCPs | `.mcp.json`, `mcp-configs/` | Native MCP config import per harness; DSH mounts opt-in `@deepseek-ai/dsh-mcp-client` rows for Context7 and CodeGraph | Supported where the harness exposes MCP |
+| Commands | `commands/`, CLI scripts | Claude slash commands, compatibility shims, CLI entrypoints; DSH registers `/ecc-goal` | Supported, but command semantics vary |
 | Memory | `.ecc/memory/`, `~/.ecc/memory/` | `ecc memory` CLI or opt-in `ecc-memory-mcp` stdio server | Supported with explicit recall and unreviewed writes |
-| Sessions | `ecc2/`, session adapters, orchestration scripts | TUI/daemon, tmux/worktree orchestration, harness-specific runners | Alpha |
+| Sessions | `ecc2/`, session adapters, orchestration scripts | TUI/daemon, tmux/worktree orchestration, harness-specific runners; DSH append-only session log plus resume/fork/replay | Alpha |
+| Engineering lifecycle | `.dsh/agent-presets/ecc/`, `.ecc/dsh-verify.json` | Native DSH agent preset with persona, skills, goal/plan/workflow composition, `/ecc-goal`, and repository-owned `ecc_verify` | Adapter-backed; preset mount and discovery verified against DSH 0.1.0-rc.6 |
 
 ## What Travels Unchanged
 
@@ -53,6 +54,7 @@ Each harness has different loading and enforcement behavior:
 - Codex reads `AGENTS.md`, plugin metadata, skills, and MCP config, but hook parity is instruction-driven.
 - OpenCode has a plugin/event system that can reuse ECC hook logic through an adapter layer.
 - Cursor uses its own rule and hook layout, so ECC maintains translated surfaces under `.cursor/`.
+- DeepSeek Harness is fully plugin-composed. ECC ships a native agent preset (`.dsh/agent-presets/ecc`) and reuses DSH plan mode, goal rounds, subagents, workflows, skills, and session log instead of translating Claude hooks.
 - Gemini support is install/instruction oriented and should be treated as a compatibility surface, not as full hook parity.
 
 Adapters should stay thin. The shared behavior belongs in `skills/`, `rules/`, `hooks/`, `scripts/`, and `mcp-configs/`.
