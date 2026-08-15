@@ -46,6 +46,7 @@ Validate without booting DSH:
 ```bash
 npm run dsh:validate
 npm run dsh:install -- --check
+npm run dsh:drift
 ```
 
 With the `dsh` binary on PATH, run the live roster + mount smoke:

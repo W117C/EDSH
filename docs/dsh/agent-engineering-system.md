@@ -44,6 +44,7 @@ ECC therefore contributes a thin agent-plane preset plus two pieces DSH lacks:
 | `.ecc/dsh-verify.json` | The verification commands, reviewed and committed as code |
 | `scripts/dsh-validate-preset.js` | Deterministic structural validation |
 | `scripts/dsh-install.js` | Standalone installer / verifier |
+| `scripts/dsh-drift-check.js` | Compares reused rows with the locally installed DSH `standard` preset |
 | `scripts/dsh-smoke.js` | Live roster + mount smoke |
 | `scripts/dsh-keyless-e2e.js` | Keyless full-lifecycle test with a mock DeepSeek SSE model |
 | `scripts/lib/install-targets/dsh-home.js` | `./install.sh --target dsh` adapter |
@@ -62,6 +63,8 @@ The default gate for this repository runs:
 ## Runtime evidence collected
 
 - `scripts/dsh-validate-preset.js`: PASS.
+- `npm run dsh:drift`: PASS against the locally installed DSH 0.1.0-rc.6
+  `standard` preset; 29 reused rows match by id, package name, and config.
 - `./install.sh --target dsh --dry-run` and a real temp-home install: PASS.
 - `npm run dsh:smoke`: PASS repeatedly; boots an isolated `dsh web`,
   discovers `ecc`, and mounts it through `session.create`.
@@ -91,5 +94,3 @@ The default gate for this repository runs:
    delivery.
 3. Promote the compliance matrix row from Adapter-backed to Native after the
    end-to-end model smoke passes.
-4. Add a drift check that compares this preset with the locally installed DSH
-   `standard` preset when a `dsh` binary is available.

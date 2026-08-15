@@ -257,6 +257,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ECC_ROW_IDS: Object.freeze(new Set(ECC_ROWS.map(([id]) => id))),
   PINNED_DSH_VERSION,
   buildPayload,
   dshYamlSchema,
