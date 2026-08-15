@@ -136,6 +136,15 @@ function runTests() {
     assert.strictEqual(record.harness, 'DeepSeek Harness');
     assert.strictEqual(record.last_verified_at, '2026-08-16');
     assert.ok(record.source_docs.includes('.dsh/agent-presets/ecc/agent.cordis.yml'));
+    assert.ok(record.verification_commands.some(command => command.includes('dsh:e2e')));
+  })) passed++; else failed++;
+
+  if (test('publishes the DSH lifecycle scripts as installable runtime', () => {
+    const packageJson = require('../../package.json');
+    for (const script of ['dsh-install.js', 'dsh-smoke.js', 'dsh-keyless-e2e.js']) {
+      assert.ok(packageJson.files.includes(`scripts/${script}`), `package files must include ${script}`);
+    }
+    assert.strictEqual(packageJson.scripts['dsh:e2e'], 'node scripts/dsh-keyless-e2e.js');
   })) passed++; else failed++;
 
   console.log(`\n${passed} passed, ${failed} failed`);

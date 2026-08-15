@@ -332,6 +332,7 @@ const ADAPTER_RECORDS = Object.freeze([
       '`npm run dsh:validate`',
       '`npm run dsh:install -- --check`',
       '`npm run dsh:smoke` (requires the `dsh` binary on PATH)',
+      '`npm run dsh:e2e` (keyless mock-model lifecycle, requires the `dsh` binary on PATH)',
       '`npm run harness:adapters -- --check`',
     ],
     risk_notes: [

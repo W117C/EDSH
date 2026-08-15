@@ -112,6 +112,29 @@ async function runTests() {
     }
   })) passed++; else failed++;
 
+  if (await runAsyncTest('reads the gate from the agent session cwd, not the dsh process cwd', async () => {
+    const ctx = await createFakeContext();
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ecc-verify-test-'));
+    fs.mkdirSync(path.join(temp, '.ecc'));
+    fs.writeFileSync(path.join(temp, '.ecc', 'dsh-verify.json'), JSON.stringify({
+      checks: [{ name: 'session-local', command: 'node -e "console.log(123)"' }],
+    }));
+
+    const previousCwd = process.cwd();
+    try {
+      const value = await ctx.definition.execute({}, {
+        signal: new AbortController().signal,
+        agent: { session: { header: { cwd: temp } } },
+      });
+      assert.strictEqual(value.ok, true);
+      assert.strictEqual(value.selected[0], 'session-local');
+      assert.strictEqual(ctx.shell.requests[0].command, 'node -e "console.log(123)"');
+      assert.strictEqual(process.cwd(), previousCwd, 'the tool must not mutate the host process cwd');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  })) passed++; else failed++;
+
   if (await runAsyncTest('returns failed evidence when a declared check exits non-zero', async () => {
     const ctx = await createFakeContext();
     ctx.nextExitCode = 1;

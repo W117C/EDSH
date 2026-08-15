@@ -1101,7 +1101,8 @@
         ".dsh",
         "scripts/dsh-install.js",
         "scripts/dsh-validate-preset.js",
-        "scripts/dsh-smoke.js"
+        "scripts/dsh-smoke.js",
+        "scripts/dsh-keyless-e2e.js"
       ],
       "targets": [
         "dsh"

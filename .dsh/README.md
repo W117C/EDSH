@@ -54,6 +54,13 @@ With the `dsh` binary on PATH, run the live roster + mount smoke:
 npm run dsh:smoke
 ```
 
+Run the keyless full-lifecycle test (local mock DeepSeek SSE server; no API
+key and no real model traffic):
+
+```bash
+npm run dsh:e2e
+```
+
 ## Use
 
 In `dsh web` or `dsh tui`:

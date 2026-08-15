@@ -21,8 +21,11 @@ function tailText(value) {
   return text.slice(-MAX_OUTPUT_CHARS)
 }
 
-async function loadConfig() {
-  const path = resolve(process.cwd(), '.ecc', 'dsh-verify.json')
+async function loadConfig(exec) {
+  // The gate belongs to the project the agent is working in, not to the
+  // process launch directory of `dsh web`/`dsh tui`.
+  const cwd = exec?.agent?.session?.header?.cwd ?? process.cwd()
+  const path = resolve(cwd, '.ecc', 'dsh-verify.json')
   const raw = await readFile(path, 'utf8')
   const config = JSON.parse(raw)
 
@@ -119,7 +122,7 @@ export function apply(ctx) {
     },
     timeoutMs: 600000,
     async execute(args, exec) {
-      const config = await loadConfig()
+      const config = await loadConfig(exec)
       const checks = selectChecks(config, args?.check)
       const results = []
       for (const check of checks) {

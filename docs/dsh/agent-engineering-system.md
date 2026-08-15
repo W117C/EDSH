@@ -1,8 +1,10 @@
 # ECC Agent Engineering System for DeepSeek Harness
 
-Status: adapter foundation verified against DeepSeek Harness 0.1.0-rc.6
-(2026-08-16). Full end-to-end model-task acceptance still requires a
-`DEEPSEEK_API_KEY` and is tracked as the next phase.
+Status: verified against DeepSeek Harness 0.1.0-rc.6 (2026-08-16). The full
+create_goal -> goal-round -> ecc_verify -> goal-complete -> delivery path is
+exercised keylessly against the real DSH runtime with a mock model. Real
+model acceptance and adversarial subagent/workflow review still require a
+`DEEPSEEK_API_KEY` and are tracked as the next phases.
 
 ## Objective
 
@@ -42,6 +44,8 @@ ECC therefore contributes a thin agent-plane preset plus two pieces DSH lacks:
 | `.ecc/dsh-verify.json` | The verification commands, reviewed and committed as code |
 | `scripts/dsh-validate-preset.js` | Deterministic structural validation |
 | `scripts/dsh-install.js` | Standalone installer / verifier |
+| `scripts/dsh-smoke.js` | Live roster + mount smoke |
+| `scripts/dsh-keyless-e2e.js` | Keyless full-lifecycle test with a mock DeepSeek SSE model |
 | `scripts/lib/install-targets/dsh-home.js` | `./install.sh --target dsh` adapter |
 
 ## Verification model
@@ -59,8 +63,15 @@ The default gate for this repository runs:
 
 - `scripts/dsh-validate-preset.js`: PASS.
 - `./install.sh --target dsh --dry-run` and a real temp-home install: PASS.
-- `npm run dsh:smoke`: PASS twice in a row; boots an isolated `dsh web`,
+- `npm run dsh:smoke`: PASS repeatedly; boots an isolated `dsh web`,
   discovers `ecc`, and mounts it through `session.create`.
+- `npm run dsh:e2e`: PASS keylessly. A local mock DeepSeek SSE server drives
+  the real DSH loop through `create_goal` -> automatic goal round -> fresh
+  `subagent` review -> two-agent `workflow` fan-out -> `ecc_verify` ->
+  `update_goal complete` -> delivery text. It then asserts `session.fork`
+  replay and a cold web-process restart over the same durable `$DSH_HOME`;
+  the restarted session still contains every tool call and can take a new
+  prompt.
 - Live `dsh web` boot with the installed `ecc` preset: preset discovered in
   `agentPreset.list` and `session.create { agentPreset: 'ecc' }` succeeded
   after the tool schema was corrected to DSH's enforced JSON Schema subset.
@@ -72,11 +83,13 @@ The default gate for this repository runs:
 
 ## Next phases
 
-1. Real-API smoke with `DEEPSEEK_API_KEY`: one end-to-end goal round using
-   `create_goal`, plan, execute, `subagent` review, `ecc_verify`, and delivery.
-2. Add a reusable `workflow` template skill for multi-file adversarial review.
-3. Exercise resume/replay after an interrupted `ecc` session.
-4. Promote the compliance matrix row from Adapter-backed to Native after the
-   end-to-end smoke passes.
-5. Add a drift check that compares this preset with the locally installed DSH
+1. Extend the keyless harness to exercise DSH plan mode: enter plan mode,
+   submit an `exit_plan_mode` plan, and assert the approval/rejection state
+   transition in the durable log.
+2. Real-API smoke with `DEEPSEEK_API_KEY`: one end-to-end task using
+   `create_goal`, plan, execute, `subagent` review, `ecc_verify`, and
+   delivery.
+3. Promote the compliance matrix row from Adapter-backed to Native after the
+   end-to-end model smoke passes.
+4. Add a drift check that compares this preset with the locally installed DSH
    `standard` preset when a `dsh` binary is available.
