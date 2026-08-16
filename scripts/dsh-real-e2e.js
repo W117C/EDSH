@@ -4,11 +4,14 @@
 /**
  * Real-model DSH acceptance smoke for the ECC preset.
  *
- * Requires DEEPSEEK_API_KEY. It boots an isolated `dsh web`, opens an `ecc`
- * session in a temporary project, and asks the real DeepSeek model to create
- * a small artifact, run the repository-owned verification gate, and report a
- * fixed delivery phrase. The assertions are artifact- and log-based, not
- * prompt-echo based.
+ * Two modes:
+ *   - isolated: requires DEEPSEEK_API_KEY, boots a private dsh web, and runs
+ *     a real DeepSeek model against a temporary project;
+ *   - reuse: --base-url <url> sends the same mission through an already
+ *     running dsh web. The operator opts in explicitly, and this script never
+ *     reads or copies the running process's credentials.
+ *
+ * Assertions are artifact- and log-based, not prompt-echo based.
  */
 
 const fs = require('fs');
@@ -32,10 +35,11 @@ const MISSION = [
 ].join(' ');
 
 function parseArgs(argv) {
-  const parsed = { timeoutMs: 900000, keep: false };
+  const parsed = { timeoutMs: 900000, keep: false, baseUrl: null };
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--timeout-ms') parsed.timeoutMs = Number(argv[++index]);
+    else if (arg === '--base-url') parsed.baseUrl = String(argv[++index]);
     else if (arg === '--keep') parsed.keep = true;
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -45,11 +49,43 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log([
-    'Usage: node scripts/dsh-real-e2e.js [--timeout-ms <ms>] [--keep]',
+    'Usage: node scripts/dsh-real-e2e.js [--timeout-ms <ms>] [--base-url <url>] [--keep]',
     '',
     'Run the ECC preset against the real DeepSeek API.',
-    'Requires DEEPSEEK_API_KEY (and optionally DEEPSEEK_BASE_URL).',
+    'Default: boot an isolated dsh web; requires DEEPSEEK_API_KEY.',
+    '--base-url: reuse an existing dsh web instance with configured credentials.',
   ].join('\n'));
+}
+
+async function runMission(baseUrl, project, timeoutMs) {
+  await waitForApi(baseUrl);
+  const created = await rpc(baseUrl, 'real-create', 'session.create', {
+    cwd: project,
+    agentPreset: 'ecc',
+  });
+  await rpc(baseUrl, 'real-prompt', 'session.prompt', {
+    sessionId: created.sessionId,
+    mode: 'queue',
+    content: [{ type: 'text', text: MISSION }],
+  });
+
+  const settled = await waitForTurnEnd(baseUrl, created.sessionId, timeoutMs);
+  const artifact = path.join(project, 'ecc-real-smoke.txt');
+  if (!fs.existsSync(artifact) || fs.readFileSync(artifact, 'utf8').trim() !== 'ecc-real-ok') {
+    throw new Error('model did not create ecc-real-smoke.txt with ecc-real-ok');
+  }
+  const events = (settled.events ?? []).map(item => item.event ?? item);
+  const finalText = events
+    .filter(event => event.type === 'assistant/message')
+    .map(event => event.data?.message?.content ?? event.data?.content ?? [])
+    .flat()
+    .map(block => block?.text ?? '')
+    .join('\n');
+  if (!finalText.includes('REAL_DELIVERY_OK')) throw new Error('final delivery phrase missing');
+  if (!JSON.stringify(settled).includes('real-ecc-ok')) {
+    throw new Error('durable history lacks ecc_verify pass evidence');
+  }
+  return { artifact, sessionId: created.sessionId };
 }
 
 async function main() {
@@ -58,53 +94,40 @@ async function main() {
     printHelp();
     return;
   }
-  if (!process.env.DEEPSEEK_API_KEY) {
-    console.log('DeepSeek Harness real-model e2e: SKIP (DEEPSEEK_API_KEY not set)');
-    return;
-  }
-  assertDshAvailable();
 
   const { tempRoot, project } = tempProject([
     { name: 'real-smoke', command: 'node -e "console.log(\'real-ecc-ok\')"', timeoutMs: 30000 },
   ]);
+
+  if (parsed.baseUrl) {
+    const outcome = await runMission(parsed.baseUrl, project, parsed.timeoutMs);
+    console.log('DeepSeek Harness real-model e2e: PASS (reused running dsh web)');
+    console.log(`- session: ${outcome.sessionId}`);
+    console.log(`- artifact: ${outcome.artifact}`);
+    console.log(`- verification evidence: real-ecc-ok`);
+    console.log(`- delivery phrase: REAL_DELIVERY_OK`);
+    if (!parsed.keep) fs.rmSync(tempRoot, { recursive: true, force: true });
+    else console.log(`kept artifacts under ${tempRoot}`);
+    return;
+  }
+
+  if (!process.env.DEEPSEEK_API_KEY) {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    console.log('DeepSeek Harness real-model e2e: SKIP (DEEPSEEK_API_KEY not set)');
+    return;
+  }
+
+  assertDshAvailable();
   const home = path.join(tempRoot, 'home');
   installDshPreset(home);
-
   const port = await reservePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const child = spawnDshWeb({ port, home });
 
   try {
-    await waitForApi(baseUrl);
-    const created = await rpc(baseUrl, 'real-create', 'session.create', {
-      cwd: project,
-      agentPreset: 'ecc',
-    });
-    await rpc(baseUrl, 'real-prompt', 'session.prompt', {
-      sessionId: created.sessionId,
-      mode: 'queue',
-      content: [{ type: 'text', text: MISSION }],
-    });
-
-    const settled = await waitForTurnEnd(baseUrl, created.sessionId, parsed.timeoutMs);
-    const artifact = path.join(project, 'ecc-real-smoke.txt');
-    if (!fs.existsSync(artifact) || fs.readFileSync(artifact, 'utf8').trim() !== 'ecc-real-ok') {
-      throw new Error('model did not create ecc-real-smoke.txt with ecc-real-ok');
-    }
-    const events = (settled.events ?? []).map(item => item.event ?? item);
-    const finalText = events
-      .filter(event => event.type === 'assistant/message')
-      .map(event => event.data?.message?.content ?? event.data?.content ?? [])
-      .flat()
-      .map(block => block?.text ?? '')
-      .join('\n');
-    if (!finalText.includes('REAL_DELIVERY_OK')) throw new Error('final delivery phrase missing');
-    if (!JSON.stringify(settled).includes('real-ecc-ok')) {
-      throw new Error('durable history lacks ecc_verify pass evidence');
-    }
-
+    const outcome = await runMission(baseUrl, project, parsed.timeoutMs);
     console.log('DeepSeek Harness real-model e2e: PASS');
-    console.log(`- artifact: ${artifact}`);
+    console.log(`- artifact: ${outcome.artifact}`);
     console.log(`- verification evidence: real-ecc-ok`);
     console.log(`- delivery phrase: REAL_DELIVERY_OK`);
   } finally {
@@ -122,4 +145,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, parseArgs };
+module.exports = { main, parseArgs, runMission };

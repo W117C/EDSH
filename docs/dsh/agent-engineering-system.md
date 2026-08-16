@@ -54,7 +54,7 @@ lacks:
 | `scripts/dsh-drift-check.js` | Compares reused rows with the locally installed DSH `standard` preset |
 | `scripts/dsh-smoke.js` | Live roster + mount smoke |
 | `scripts/dsh-keyless-e2e.js` | Keyless full-lifecycle test with a mock DeepSeek SSE model |
-| `scripts/dsh-real-e2e.js` | Real DeepSeek acceptance test; skips without `DEEPSEEK_API_KEY` |
+| `scripts/dsh-real-e2e.js` | Real DeepSeek acceptance test; isolated mode or `--base-url` reuse of a running dsh web |
 | `scripts/lib/dsh-test-runtime.js` | Shared isolated-process/API/teardown runtime for the three DSH test harnesses |
 | `scripts/lib/install-targets/dsh-home.js` | `./install.sh --target dsh` adapter |
 

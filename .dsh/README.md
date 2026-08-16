@@ -70,6 +70,13 @@ With `DEEPSEEK_API_KEY` set, run the real-model acceptance test:
 npm run dsh:real-e2e
 ```
 
+Or reuse an already-running `dsh web` whose credentials are configured (the
+script never reads or copies that process's key):
+
+```bash
+npm run dsh:real-e2e -- --base-url http://127.0.0.1:3080
+```
+
 ## Use
 
 In `dsh web` or `dsh tui`:
