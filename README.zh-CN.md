@@ -17,6 +17,11 @@
 
 > **140K+ stars** | **21K+ forks** | **170+ 贡献者** | **12+ 语言系统** | **Anthropic黑客松获胜者**
 
+> **EDSH** — 基于 ECC 构建的原生 DeepSeek Harness（DSH）Agent 工程系统。
+> 让 DeepSeek Agent 从需求出发，经过规划、执行、测试、审查、修复与验证，
+> 以最少人工干预完成交付。
+> 详见 [`docs/dsh/agent-engineering-system.md`](docs/dsh/agent-engineering-system.md)。
+
 ---
 
 <div align="center">
