@@ -1,10 +1,9 @@
 # ECC Agent Engineering System for DeepSeek Harness
 
 Status: verified against DeepSeek Harness 0.1.0-rc.6 (2026-08-16). The full
-create_goal -> goal-round -> ecc_verify -> goal-complete -> delivery path is
-exercised keylessly against the real DSH runtime with a mock model. Real
-model acceptance and adversarial subagent/workflow review still require a
-`DEEPSEEK_API_KEY` and are tracked as the next phases.
+create_goal -> plan -> execute -> review -> ecc_verify -> goal-complete ->
+delivery path is exercised against the real DSH runtime both keylessly and
+with the real DeepSeek V4 model through a running `dsh web`.
 
 ## Objective
 
@@ -110,18 +109,22 @@ The default gate for this repository runs:
   `dsh web` reports PASS for the `ecc` preset, both V4 models
   (`deepseek-v4-flash`, `deepseek-v4-pro`), and a configured
   `DEEPSEEK_API_KEY`; it creates no session and sends no prompt.
+- Real-model acceptance: PASS through the operator's running `dsh web`
+  (`--base-url http://127.0.0.1:3080`). The real DeepSeek model created
+  `ecc-real-smoke.txt`, called `ecc_verify` (evidence `real-ecc-ok`), and
+  returned the fixed `REAL_DELIVERY_OK` delivery phrase. The running web
+  process stayed alive and untouched.
 
-## Remaining acceptance
-
-1. Run the real-model acceptance command when operator credentials are
-   available:
+## Operator acceptance command
 
 ```bash
-DEEPSEEK_API_KEY=... npm run dsh:real-e2e
-# or reuse a running dsh web without copying its key:
+# Read-only readiness check (no session, no token spend):
+npm run dsh:real-e2e -- --base-url http://127.0.0.1:3080 --dry-run
+
+# Real-model acceptance through a running dsh web:
 npm run dsh:real-e2e -- --base-url http://127.0.0.1:3080
 ```
 
-The compliance matrix row is already `Native`: ECC installs and verifies the
-surface directly. The real-model run is the final product-level acceptance
-evidence, kept operator-gated so the repository never embeds credentials.
+The compliance matrix row is `Native`: ECC installs and verifies the surface
+directly, and the real-model acceptance command is operator-gated so the
+repository never embeds credentials.
