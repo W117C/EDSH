@@ -64,6 +64,12 @@ key and no real model traffic):
 npm run dsh:e2e
 ```
 
+With `DEEPSEEK_API_KEY` set, run the real-model acceptance test:
+
+```bash
+npm run dsh:real-e2e
+```
+
 ## Use
 
 In `dsh web` or `dsh tui`:

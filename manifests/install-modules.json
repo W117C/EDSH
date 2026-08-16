@@ -1103,7 +1103,8 @@
         "scripts/dsh-validate-preset.js",
         "scripts/dsh-smoke.js",
         "scripts/dsh-keyless-e2e.js",
-        "scripts/dsh-drift-check.js"
+        "scripts/dsh-drift-check.js",
+        "scripts/dsh-real-e2e.js"
       ],
       "targets": [
         "dsh"

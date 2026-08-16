@@ -141,10 +141,11 @@ function runTests() {
 
   if (test('publishes the DSH lifecycle scripts as installable runtime', () => {
     const packageJson = require('../../package.json');
-    for (const script of ['dsh-install.js', 'dsh-drift-check.js', 'dsh-smoke.js', 'dsh-keyless-e2e.js']) {
+    for (const script of ['dsh-install.js', 'dsh-drift-check.js', 'dsh-smoke.js', 'dsh-keyless-e2e.js', 'dsh-real-e2e.js']) {
       assert.ok(packageJson.files.includes(`scripts/${script}`), `package files must include ${script}`);
     }
     assert.strictEqual(packageJson.scripts['dsh:e2e'], 'node scripts/dsh-keyless-e2e.js');
+    assert.strictEqual(packageJson.scripts['dsh:real-e2e'], 'node scripts/dsh-real-e2e.js');
   })) passed++; else failed++;
 
   console.log(`\n${passed} passed, ${failed} failed`);

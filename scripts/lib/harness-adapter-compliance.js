@@ -335,6 +335,7 @@ const ADAPTER_RECORDS = Object.freeze([
       '`npm run dsh:drift` (requires the `dsh` binary on PATH)',
       '`npm run dsh:smoke` (requires the `dsh` binary on PATH)',
       '`npm run dsh:e2e` (keyless mock-model lifecycle, requires the `dsh` binary on PATH)',
+      '`npm run dsh:real-e2e` (real DeepSeek model, requires `DEEPSEEK_API_KEY`)',
       '`npm run harness:adapters -- --check`',
     ],
     risk_notes: [

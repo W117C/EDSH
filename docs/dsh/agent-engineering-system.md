@@ -53,6 +53,7 @@ lacks:
 | `scripts/dsh-drift-check.js` | Compares reused rows with the locally installed DSH `standard` preset |
 | `scripts/dsh-smoke.js` | Live roster + mount smoke |
 | `scripts/dsh-keyless-e2e.js` | Keyless full-lifecycle test with a mock DeepSeek SSE model |
+| `scripts/dsh-real-e2e.js` | Real DeepSeek acceptance test; skips without `DEEPSEEK_API_KEY` |
 | `scripts/lib/install-targets/dsh-home.js` | `./install.sh --target dsh` adapter |
 
 ## Verification model
@@ -102,8 +103,8 @@ The default gate for this repository runs:
 
 ## Next phases
 
-1. Real-API smoke with `DEEPSEEK_API_KEY`: one end-to-end task using
-   `create_goal`, plan, execute, `subagent` review, `ecc_verify`, and
-   delivery.
+1. Run `npm run dsh:real-e2e` with `DEEPSEEK_API_KEY` to execute the
+   implemented real-model acceptance path (the current environment has no
+   key, so the script reports SKIP).
 2. Promote the compliance matrix row from Adapter-backed to Native after the
    end-to-end model smoke passes.
