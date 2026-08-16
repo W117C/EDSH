@@ -154,7 +154,7 @@ function createMockServer() {
         toolCall = {
           name: 'bash',
           arguments: {
-            command: 'printf "built-ok\\n" > artifact.txt',
+            command: 'node -e "require(\'fs\').writeFileSync(\'app.js\', \'module.exports = (x) => x + 1;\\n\')"',
             description: 'write build artifact',
           },
         };
@@ -433,6 +433,11 @@ async function main() {
   const mock = await startMock();
   const { tempRoot, project } = tempProject([
     { name: 'keyless', command: 'node -e "console.log(\'ecc-keyless-ok\')"', timeoutMs: 30000 },
+    {
+      name: 'app-test',
+      command: 'node -e "const fs=require(\'fs\'); if(!fs.existsSync(\'./app.js\')){console.log(\'app-test-skipped\');process.exit(0)} const f=require(\'./app\'); if(f(1)!==2) process.exit(1); console.log(\'app-ecc-ok\')"',
+      timeoutMs: 30000,
+    },
   ]);
   const home = path.join(tempRoot, 'home');
   installDshPreset(home);
@@ -661,9 +666,12 @@ async function main() {
     });
     const buildHistory = await waitForTurnEnd(baseUrl, sessionId, parsed.timeoutMs);
     const buildEvents = (buildHistory.events ?? []).map(item => item.event ?? item);
-    const buildArtifact = path.join(project, 'artifact.txt');
-    if (!fs.existsSync(buildArtifact) || fs.readFileSync(buildArtifact, 'utf8').trim() !== 'built-ok') {
-      throw new Error('build mission did not produce artifact.txt with built-ok');
+    const buildArtifact = path.join(project, 'app.js');
+    if (!fs.existsSync(buildArtifact) || !fs.readFileSync(buildArtifact, 'utf8').includes('x + 1')) {
+      throw new Error('build mission did not produce app.js with the required implementation');
+    }
+    if (!JSON.stringify(buildHistory).includes('app-ecc-ok')) {
+      throw new Error('build mission ecc_verify did not run the real app test');
     }
     if (!buildEvents.some(event => event.type === 'tool/call' && event.data?.name === 'bash')) {
       throw new Error('build mission did not log a real bash tool call');

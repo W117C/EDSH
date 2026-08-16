@@ -91,8 +91,9 @@ The default gate for this repository runs:
   plan-review question with Approve through DSH's WebSocket mux channel;
   `plan/mode` active -> inactive lands in the durable session log. A fourth
   BUILD_MISSION scenario executes a real `bash` write through DSH, then
-  `ecc_verify` checks the resulting `artifact.txt`, and the goal completes —
-  so the harness exercises real filesystem execution, not only orchestration.
+  `ecc_verify` runs a real `node` test against the resulting `app.js` in the
+  agent session cwd, and the goal completes — so the harness exercises real
+  code production and test verification, not only orchestration.
 - Live `dsh web` boot with the installed `ecc` preset: preset discovered in
   `agentPreset.list` and `session.create { agentPreset: 'ecc' }` succeeded
   after the tool schema was corrected to DSH's enforced JSON Schema subset.

@@ -21,11 +21,14 @@ function tailText(value) {
   return text.slice(-MAX_OUTPUT_CHARS)
 }
 
-async function loadConfig(exec) {
+function sessionCwd(exec) {
   // The gate belongs to the project the agent is working in, not to the
   // process launch directory of `dsh web`/`dsh tui`.
-  const cwd = exec?.agent?.session?.header?.cwd ?? process.cwd()
-  const path = resolve(cwd, '.ecc', 'dsh-verify.json')
+  return exec?.agent?.session?.header?.cwd ?? process.cwd()
+}
+
+async function loadConfig(exec) {
+  const path = resolve(sessionCwd(exec), '.ecc', 'dsh-verify.json')
   const raw = await readFile(path, 'utf8')
   const config = JSON.parse(raw)
 
@@ -58,9 +61,10 @@ function selectChecks(config, requested) {
   return config.checks.filter(check => check.name === requested)
 }
 
-async function runCheck(ctx, check, signal) {
+async function runCheck(ctx, check, signal, workdir) {
   const request = {
     command: check.command,
+    workdir,
     timeoutMs: Number.isSafeInteger(check.timeoutMs) && check.timeoutMs > 0
       ? check.timeoutMs
       : DEFAULT_TIMEOUT_MS,
@@ -124,9 +128,10 @@ export function apply(ctx) {
     async execute(args, exec) {
       const config = await loadConfig(exec)
       const checks = selectChecks(config, args?.check)
+      const workdir = sessionCwd(exec)
       const results = []
       for (const check of checks) {
-        results.push(await runCheck(ctx, check, exec.signal))
+        results.push(await runCheck(ctx, check, exec.signal, workdir))
       }
       const ok = results.every(check => (
         check.exitCode === 0 && !check.timedOut && !check.aborted

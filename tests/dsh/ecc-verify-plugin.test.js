@@ -129,6 +129,7 @@ async function runTests() {
       assert.strictEqual(value.ok, true);
       assert.strictEqual(value.selected[0], 'session-local');
       assert.strictEqual(ctx.shell.requests[0].command, 'node -e "console.log(123)"');
+      assert.strictEqual(ctx.shell.requests[0].workdir, temp, 'commands must run in the agent session cwd');
       assert.strictEqual(process.cwd(), previousCwd, 'the tool must not mutate the host process cwd');
     } finally {
       fs.rmSync(temp, { recursive: true, force: true });
