@@ -1,7 +1,7 @@
 {
   "name": "ecc-universal",
   "version": "2.2.0",
-  "description": "Harness-native agent operating system for Codex, OpenCode, Cursor, Gemini, Claude Code, and terminal workflows - skills, hooks, rules, MCP conventions, and operator control-plane patterns",
+  "description": "EDSH - DeepSeek Harness (DSH) native Agent Engineering System built on ECC. Lets a DeepSeek agent go from requirements to plan, execute, test, review, verify, and deliver with minimal human intervention.",
   "publishConfig": {
     "access": "public"
   },
@@ -14,6 +14,10 @@
     "rules",
     "harness",
     "agent-harness",
+    "deepseek",
+    "dsh",
+    "agent-engineering",
+    "autonomous",
     "tdd",
     "code-review",
     "security",
@@ -33,11 +37,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/affaan-m/ECC.git"
+    "url": "git+https://github.com/W117C/EDSH.git"
   },
-  "homepage": "https://github.com/affaan-m/ECC#readme",
+  "homepage": "https://github.com/W117C/EDSH#readme",
   "bugs": {
-    "url": "https://github.com/affaan-m/ECC/issues"
+    "url": "https://github.com/W117C/EDSH/issues"
   },
   "files": [
     ".agents/",

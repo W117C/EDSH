@@ -2,6 +2,11 @@
   <img src="assets/hero.png" alt="ECC - the agent harness operating system" width="100%" />
 </p>
 
+> **EDSH** — DeepSeek Harness (DSH) native Agent Engineering System built on ECC.
+> It lets a DeepSeek agent go from requirements to plan, execute, test, review,
+> verify, and deliver with minimal human intervention.
+> See [`docs/dsh/agent-engineering-system.md`](docs/dsh/agent-engineering-system.md).
+
 <p align="center">
   <a href="https://www.star-history.com/affaan-m/ecc">
     <picture>
