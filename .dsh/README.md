@@ -74,6 +74,10 @@ Or reuse an already-running `dsh web` whose credentials are configured (the
 script never reads or copies that process's key):
 
 ```bash
+# Read-only readiness check: no session, no prompt, no token spend.
+npm run dsh:real-e2e -- --base-url http://127.0.0.1:3080 --dry-run
+
+# Actual acceptance run.
 npm run dsh:real-e2e -- --base-url http://127.0.0.1:3080
 ```
 

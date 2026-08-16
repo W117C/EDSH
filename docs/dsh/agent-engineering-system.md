@@ -106,6 +106,10 @@ The default gate for this repository runs:
   fresh process group, then also clean up any daemonized child through the
   exact reserved listening port; both were run while a separate user-owned
   `dsh web` process stayed alive and untouched.
+- Real-model readiness: read-only `--dry-run` against the operator's running
+  `dsh web` reports PASS for the `ecc` preset, both V4 models
+  (`deepseek-v4-flash`, `deepseek-v4-pro`), and a configured
+  `DEEPSEEK_API_KEY`; it creates no session and sends no prompt.
 
 ## Remaining acceptance
 

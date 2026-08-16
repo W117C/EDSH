@@ -35,11 +35,12 @@ const MISSION = [
 ].join(' ');
 
 function parseArgs(argv) {
-  const parsed = { timeoutMs: 900000, keep: false, baseUrl: null };
+  const parsed = { timeoutMs: 900000, keep: false, baseUrl: null, dryRun: false };
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--timeout-ms') parsed.timeoutMs = Number(argv[++index]);
     else if (arg === '--base-url') parsed.baseUrl = String(argv[++index]);
+    else if (arg === '--dry-run') parsed.dryRun = true;
     else if (arg === '--keep') parsed.keep = true;
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -49,11 +50,12 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log([
-    'Usage: node scripts/dsh-real-e2e.js [--timeout-ms <ms>] [--base-url <url>] [--keep]',
+    'Usage: node scripts/dsh-real-e2e.js [--timeout-ms <ms>] [--base-url <url>] [--dry-run] [--keep]',
     '',
     'Run the ECC preset against the real DeepSeek API.',
     'Default: boot an isolated dsh web; requires DEEPSEEK_API_KEY.',
     '--base-url: reuse an existing dsh web instance with configured credentials.',
+    '--dry-run: read-only readiness check; creates no session and sends no prompt.',
   ].join('\n'));
 }
 
@@ -92,6 +94,32 @@ async function main() {
   const parsed = parseArgs(process.argv);
   if (parsed.help) {
     printHelp();
+    return;
+  }
+
+  if (parsed.dryRun) {
+    if (!parsed.baseUrl) throw new Error('--dry-run requires --base-url');
+    await waitForApi(parsed.baseUrl);
+    const roster = await rpc(parsed.baseUrl, 'real-ready-list', 'agentPreset.list', {});
+    const preset = roster.presets.find(candidate => candidate.id === 'ecc');
+    if (!preset || preset.broken !== undefined) {
+      throw new Error(`ecc preset unavailable: ${JSON.stringify(preset)}`);
+    }
+    const models = await rpc(parsed.baseUrl, 'real-ready-models', 'llm.models', {});
+    const ids = (models.groups ?? []).flatMap(group => (group.models ?? []).map(model => model.id));
+    for (const expected of ['deepseek-v4-flash', 'deepseek-v4-pro']) {
+      if (!ids.includes(expected)) throw new Error(`real model catalog missing ${expected}`);
+    }
+    const credentials = await rpc(parsed.baseUrl, 'real-ready-cred', 'credentials.describe', {
+      refs: ['DEEPSEEK_API_KEY'],
+    });
+    if (credentials.credentials?.DEEPSEEK_API_KEY?.configured !== true) {
+      throw new Error('DEEPSEEK_API_KEY is not configured in the reused dsh web');
+    }
+    console.log('DeepSeek Harness real-model readiness: PASS (read-only)');
+    console.log(`- preset: ${preset.name}`);
+    console.log(`- models: ${ids.join(', ')}`);
+    console.log(`- credential: DEEPSEEK_API_KEY configured=true`);
     return;
   }
 
