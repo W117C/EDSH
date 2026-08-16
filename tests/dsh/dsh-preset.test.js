@@ -126,7 +126,7 @@ function runTests() {
       homeDir: '/home/tester',
       modules: [module],
     });
-    assert.strictEqual(plan.operations.length, 6, 'three preset plugins + composition + metadata + skill');
+    assert.strictEqual(plan.operations.length, 7, 'four preset plugins + composition + metadata + skill');
   })) passed++; else failed++;
 
   if (test('adds DeepSeek Harness to the adapter compliance records', () => {

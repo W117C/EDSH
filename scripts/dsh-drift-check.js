@@ -98,9 +98,10 @@ function buildPayload() {
       continue;
     }
     compared.push(id);
-    // `persona` is an intentional ECC replacement; every other reused row
-    // must keep the upstream config contract byte-for-byte.
-    if (id !== 'persona' && stableConfig(upstreamEntry) !== stableConfig(oursEntry)) {
+    // `persona` is an intentional ECC replacement. Groups are compared
+    // through their flattened child rows above, so an ECC child inserted into
+    // a reused group does not make the whole group look drifted.
+    if (id !== 'persona' && oursEntry.group !== true && stableConfig(upstreamEntry) !== stableConfig(oursEntry)) {
       mismatches.push(`${id}: config drifted from installed standard preset`);
     }
   }

@@ -45,6 +45,7 @@ lacks:
 | `.dsh/agent-presets/ecc/ecc-lifecycle.mjs` | Phase protocol prompt section and `/ecc-goal` command |
 | `.dsh/agent-presets/ecc/ecc-verify.mjs` | `ecc_verify` tool; model can select only declared checks |
 | `.dsh/agent-presets/ecc/ecc-completion-gate.mjs` | Blocks goal completion without a current-goal `ecc_verify` pass |
+| `.dsh/agent-presets/ecc/ecc-plan-control.mjs` | Model-facing `ecc_plan` entry into DSH plan mode |
 | `.dsh/skills/engineering-lifecycle.md` | Loadable phase-gate skill, discovered by DSH |
 | `.ecc/dsh-verify.json` | The verification commands, reviewed and committed as code |
 | `scripts/dsh-validate-preset.js` | Deterministic structural validation |
@@ -81,7 +82,9 @@ The default gate for this repository runs:
   the restarted session still contains every tool call and can take a new
   prompt. A second CHEAT scenario tries `update_goal complete` before
   verification: the completion gate blocks it, the mock model repairs by
-  running `ecc_verify`, and the retry completes.
+  running `ecc_verify`, and the retry completes. A third PLAN_TEST scenario
+  calls the model-facing `ecc_plan` tool; the next request carries DSH's
+  plan-mode policy and `plan/mode` lands in the durable session log.
 - Live `dsh web` boot with the installed `ecc` preset: preset discovered in
   `agentPreset.list` and `session.create { agentPreset: 'ecc' }` succeeded
   after the tool schema was corrected to DSH's enforced JSON Schema subset.
@@ -96,9 +99,8 @@ The default gate for this repository runs:
 
 ## Next phases
 
-1. Extend the keyless harness to exercise DSH plan mode: enter plan mode,
-   submit an `exit_plan_mode` plan, and assert the approval/rejection state
-   transition in the durable log.
+1. Exercise the `exit_plan_mode` approval/rejection path keylessly through
+   DSH's question SSE channel, so plan approval state is also covered.
 2. Real-API smoke with `DEEPSEEK_API_KEY`: one end-to-end task using
    `create_goal`, plan, execute, `subagent` review, `ecc_verify`, and
    delivery.

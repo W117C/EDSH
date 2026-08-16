@@ -15,6 +15,7 @@ repository-owned verification gate, and an enforced completion interlock.
 | `agent-presets/ecc/ecc-lifecycle.mjs` | Loads the requirements → plan → execute → test → review → repair → verify → deliver protocol and the `/ecc-goal` command |
 | `agent-presets/ecc/ecc-verify.mjs` | Registers `ecc_verify`, which runs only commands declared in `.ecc/dsh-verify.json` |
 | `agent-presets/ecc/ecc-completion-gate.mjs` | Blocks `update_goal complete` until the current goal has its own passing `ecc_verify` result |
+| `agent-presets/ecc/ecc-plan-control.mjs` | Model-facing `ecc_plan` entry into DSH plan mode |
 | `skills/engineering-lifecycle.md` | Loadable companion skill for the phase gates |
 | `../.ecc/dsh-verify.json` | Repository-owned verification commands; edit and commit as code |
 

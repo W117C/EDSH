@@ -60,6 +60,7 @@ const ECC_ROWS = Object.freeze([
   ['ecc-lifecycle', './ecc-lifecycle.mjs'],
   ['ecc-verify', './ecc-verify.mjs'],
   ['ecc-completion-gate', './ecc-completion-gate.mjs'],
+  ['planning/ecc-plan-control', './ecc-plan-control.mjs'],
   ['mcp-context7', '@deepseek-ai/dsh-mcp-client'],
   ['mcp-codegraph', '@deepseek-ai/dsh-mcp-client'],
 ]);

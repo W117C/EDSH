@@ -147,6 +147,10 @@ function createMockServer() {
         text = 'REVIEW_PASS';
       } else if (userText.includes('Workflow reviewer')) {
         text = 'WF_OK';
+      } else if (userText.includes('PLAN_TEST') && !assistantCalls.includes('ecc_plan')) {
+        toolCall = { name: 'ecc_plan', arguments: {} };
+      } else if (userText.includes('PLAN_TEST')) {
+        text = 'PLAN_MODE_OK';
       } else if (cheatMode && cheatGoalId === undefined) {
         toolCall = {
           name: 'create_goal',
@@ -605,6 +609,31 @@ async function main() {
       throw new Error(`expected one blocked completion plus two successful completions; saw ${updateGoalAttempts}`);
     }
 
+    // Plan-mode scenario: the model calls ecc_plan, the next request must be
+    // assembled under DSH's plan-mode policy, and `plan/mode` must be durable.
+    await rpc(baseUrl, 'e2e-plan-prompt', 'session.prompt', {
+      sessionId,
+      mode: 'queue',
+      content: [{ type: 'text', text: 'PLAN_TEST: enter plan mode and inspect.' }],
+    });
+    const planHistory = await waitForTurnEnd(baseUrl, sessionId, parsed.timeoutMs);
+    const planEvents = (planHistory.events ?? []).map(item => item.event ?? item);
+    if (!planEvents.some(event => event.type === 'tool/call' && event.data?.name === 'ecc_plan')) {
+      throw new Error('durable log missing ecc_plan tool call');
+    }
+    const activePlanEvents = planEvents.filter(event => (
+      event.type === 'plan/mode' && event.data?.active === true
+    ));
+    if (activePlanEvents.length === 0) {
+      throw new Error('durable log missing active plan/mode event');
+    }
+    const planPolicyRequest = mock.state.requests.some(request => (
+      JSON.stringify(request.messages ?? []).includes('You are in plan mode')
+    ));
+    if (!planPolicyRequest) {
+      throw new Error('no model request carried the DSH plan-mode policy');
+    }
+
     console.log('DeepSeek Harness keyless lifecycle: PASS');
     console.log(`- mock requests: ${mock.state.requests.length}`);
     console.log(`- tool calls logged: ${toolCallNames.join(', ')}`);
@@ -615,6 +644,7 @@ async function main() {
     console.log(`- fork replay tool calls: ${forkCalls.join(', ')}`);
     console.log(`- cold resume tool calls preserved: ${resumedCalls.join(', ')}`);
     console.log(`- completion gate blocked then repaired: ${updateGoalAttempts} update_goal attempts`);
+    console.log(`- plan mode entries: ${activePlanEvents.length}`);
     console.log(`- final delivery: ${finalText.split('\n').find(line => line.includes('Delivery'))}`);
   } finally {
     await stopWeb(child);
