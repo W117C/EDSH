@@ -54,6 +54,7 @@ lacks:
 | `scripts/dsh-smoke.js` | Live roster + mount smoke |
 | `scripts/dsh-keyless-e2e.js` | Keyless full-lifecycle test with a mock DeepSeek SSE model |
 | `scripts/dsh-real-e2e.js` | Real DeepSeek acceptance test; skips without `DEEPSEEK_API_KEY` |
+| `scripts/lib/dsh-test-runtime.js` | Shared isolated-process/API/teardown runtime for the three DSH test harnesses |
 | `scripts/lib/install-targets/dsh-home.js` | `./install.sh --target dsh` adapter |
 
 ## Verification model
@@ -87,7 +88,10 @@ The default gate for this repository runs:
   calls the model-facing `ecc_plan` tool, verifies that the next request
   carries DSH's plan-mode policy, submits `exit_plan_mode`, and answers the
   plan-review question with Approve through DSH's WebSocket mux channel;
-  `plan/mode` active -> inactive lands in the durable session log.
+  `plan/mode` active -> inactive lands in the durable session log. A fourth
+  BUILD_MISSION scenario executes a real `bash` write through DSH, then
+  `ecc_verify` checks the resulting `artifact.txt`, and the goal completes —
+  so the harness exercises real filesystem execution, not only orchestration.
 - Live `dsh web` boot with the installed `ecc` preset: preset discovered in
   `agentPreset.list` and `session.create { agentPreset: 'ecc' }` succeeded
   after the tool schema was corrected to DSH's enforced JSON Schema subset.

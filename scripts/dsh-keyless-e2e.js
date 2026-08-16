@@ -21,12 +21,19 @@
 
 const fs = require('fs');
 const http = require('http');
-const net = require('net');
-const os = require('os');
 const path = require('path');
-const { spawn, spawnSync } = require('child_process');
-
-const ROOT = path.resolve(__dirname, '..');
+const {
+  assertDshAvailable,
+  collectHistory,
+  installDshPreset,
+  reservePort,
+  rpc,
+  spawnDshWeb,
+  stopDshWeb,
+  tempProject,
+  waitForApi,
+  waitForTurnEnd,
+} = require('./lib/dsh-test-runtime');
 const MISSION = 'Build and verify a keyless mission.';
 const DELIVERY = 'Delivery complete: keyless lifecycle evidence collected.';
 
@@ -61,27 +68,6 @@ function printHelp() {
   ].join('\n'));
 }
 
-function assertDshAvailable() {
-  const checked = spawnSync('dsh', ['--version'], { encoding: 'utf8' });
-  if (checked.status !== 0) {
-    throw new Error('dsh binary not found on PATH');
-  }
-}
-
-async function reservePort() {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(error => {
-        if (error) reject(error);
-        else resolve(port);
-      });
-    });
-  });
-}
-
 /** Local OpenAI/DeepSeek-compatible chat-completions SSE mock. */
 function createMockServer() {
   const state = {
@@ -90,6 +76,7 @@ function createMockServer() {
     verifySeen: false,
     cheatUpdateAttempts: 0,
     cheatVerifyStarted: false,
+    buildStep: 0,
   };
 
   const server = http.createServer((request, response) => {
@@ -134,9 +121,15 @@ function createMockServer() {
       );
       const cheatGoalId = cheatGoalResult?.[1];
       const cheatGoalRevision = Number(cheatGoalResult?.[2]);
+      const buildGoalResult = toolText.match(
+        /\{"goal":\{"id":"([^"]+)","revision":(\d+),"objective":"Build ECC mission"/
+      );
+      const buildGoalId = buildGoalResult?.[1];
+      const buildGoalRevision = Number(buildGoalResult?.[2]);
       const hasGoalRound = userText.includes('<goal_round>');
       const hasVerifyResult = toolText.includes('ecc-keyless-ok');
       const cheatMode = userText.includes('CHEAT');
+      const buildMode = userText.includes('BUILD_MISSION');
 
       let text = null;
       let toolCall = null;
@@ -147,6 +140,37 @@ function createMockServer() {
         text = 'REVIEW_PASS';
       } else if (userText.includes('Workflow reviewer')) {
         text = 'WF_OK';
+      } else if (buildMode && buildGoalId === undefined) {
+        toolCall = {
+          name: 'create_goal',
+          arguments: { objective: 'Build ECC mission', max_goal_rounds: 1 },
+        };
+        state.createGoalSeen = true;
+      } else if (buildMode && !hasGoalRound) {
+        text = 'Goal armed; the build mission will now execute and verify a real artifact.';
+      } else if (buildMode && state.buildStep === 0) {
+        toolCall = {
+          name: 'bash',
+          arguments: {
+            command: 'printf "built-ok\\n" > artifact.txt',
+            description: 'write build artifact',
+          },
+        };
+        state.buildStep = 1;
+      } else if (buildMode && state.buildStep === 1) {
+        toolCall = { name: 'ecc_verify', arguments: {} };
+        state.buildStep = 2;
+      } else if (buildMode && state.buildStep === 2 && hasVerifyResult) {
+        toolCall = {
+          name: 'update_goal',
+          arguments: {
+            goal_id: buildGoalId,
+            revision: buildGoalRevision,
+            action: 'complete',
+          },
+        };
+        text = DELIVERY;
+        state.buildStep = 3;
       } else if (userText.includes('PLAN_TEST') && !assistantCalls.includes('ecc_plan')) {
         toolCall = { name: 'ecc_plan', arguments: {} };
       } else if (userText.includes('PLAN_TEST') && !assistantCalls.includes('exit_plan_mode')) {
@@ -297,61 +321,6 @@ async function closeServer(server) {
   await new Promise(resolve => server.close(() => resolve()));
 }
 
-async function waitForApi(baseUrl, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  let lastError;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${baseUrl}/api/agentPreset.list`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          type: 'client-request',
-          rpcId: 'e2e-ready',
-          method: 'agentPreset.list',
-          payload: {},
-        }),
-        signal: AbortSignal.timeout(2000),
-      });
-      if (response.ok) {
-        const body = await response.json();
-        if (body.result?.ok === true) return;
-        lastError = new Error(JSON.stringify(body.result?.error ?? body));
-      } else {
-        lastError = new Error(`HTTP ${response.status}`);
-      }
-    } catch (error) {
-      lastError = error;
-    }
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  throw new Error(`dsh web did not become API-ready: ${lastError ?? 'timeout'}`);
-}
-
-async function rpc(baseUrl, rpcId, method, payload) {
-  const response = await fetch(`${baseUrl}/api/${method}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ type: 'client-request', rpcId, method, payload }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error(`${method} HTTP ${response.status}`);
-  const body = await response.json();
-  if (body.result?.ok !== true) {
-    throw new Error(`${method} failed: ${JSON.stringify(body.result?.error ?? body)}`);
-  }
-  return body.result.value;
-}
-
-async function sleep(ms) {
-  return await new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Read the mux SSE stream and answer DSH plan-review questions with Approve.
- *
- * @returns answer statistics after the caller aborts the stream.
- */
 async function answerPlanReviews(baseUrl, sessionId, signal) {
   const stats = { seen: 0, answered: 0 };
   const url = new URL('/api/events.mux', baseUrl);
@@ -419,65 +388,6 @@ async function answerPlanReviews(baseUrl, sessionId, signal) {
   return stats;
 }
 
-function spawnWeb({ port, home, mockUrl }) {
-  return spawn('dsh', ['web', '--host', '127.0.0.1', '--port', String(port)], {
-    cwd: ROOT,
-    env: {
-      ...process.env,
-      DSH_HOME: home,
-      DEEPSEEK_BASE_URL: mockUrl,
-      DEEPSEEK_API_KEY: 'test-key',
-      DSH_PERMISSION_MODE: 'danger-full-access',
-      ECC_DSH_MCP_CONTEXT7: '0',
-      ECC_DSH_MCP_CODEGRAPH: '0',
-    },
-    stdio: ['ignore', 'ignore', 'ignore'],
-    // Every e2e web process becomes the leader of a fresh process group.
-    // Teardown kills that group id, so the script can never signal the
-    // user's own dsh web instance or any unrelated dsh process.
-    detached: process.platform !== 'win32',
-  });
-}
-
-function killPortOwners(port) {
-  // dsh web can daemonize its actual server child, so the spawn-tree group
-  // kill above is not sufficient on every platform. This narrows cleanup to
-  // exactly the PIDs listening on the port THIS script reserved; it never
-  // scans for or signals other dsh processes.
-  const checked = spawnSync('lsof', [
-    '-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t',
-  ], { encoding: 'utf8', timeout: 5000 });
-  if (checked.status !== 0) return;
-  for (const rawPid of checked.stdout.split('\n')) {
-    const pid = Number(rawPid.trim());
-    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) continue;
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch {
-      // The listener may have exited between lsof and kill.
-    }
-  }
-}
-
-async function stopWeb(child, port) {
-  if (!child || child.exitCode !== null) return;
-  if (process.platform !== 'win32') {
-    try {
-      process.kill(-child.pid, 'SIGTERM');
-    } catch {
-      child.kill('SIGTERM');
-    }
-  } else {
-    child.kill('SIGTERM');
-  }
-  await Promise.race([
-    new Promise(resolve => child.once('exit', resolve)),
-    sleep(3000),
-  ]);
-  await sleep(300);
-  killPortOwners(port);
-}
-
 function findDeep(data, predicate) {
   const matches = [];
   const visit = value => {
@@ -489,38 +399,6 @@ function findDeep(data, predicate) {
   return matches;
 }
 
-async function collectHistory(baseUrl, sessionId) {
-  const value = await rpc(baseUrl, 'e2e-history', 'session.history', {
-    sessionId,
-    maxMessages: 200,
-  });
-  return value;
-}
-
-async function waitForTurnEnd(baseUrl, sessionId, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  let history;
-  while (Date.now() < deadline) {
-    history = await collectHistory(baseUrl, sessionId);
-    const events = Array.isArray(history.events) ? history.events : [];
-    let sawTurn = false;
-    let open = false;
-    for (const item of events) {
-      const type = item.event?.type;
-      if (type === 'turn/start') {
-        sawTurn = true;
-        open = true;
-      } else if (type === 'turn/end') {
-        sawTurn = true;
-        open = false;
-      }
-    }
-    if (sawTurn && !open) return history;
-    await sleep(250);
-  }
-  throw new Error(`session did not settle within ${timeoutMs}ms`);
-}
-
 async function main() {
   const parsed = parseArgs(process.argv);
   if (parsed.help) {
@@ -530,28 +408,22 @@ async function main() {
   assertDshAvailable();
 
   const mock = await startMock();
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ecc-dsh-e2e-'));
+  const { tempRoot, project } = tempProject([
+    { name: 'keyless', command: 'node -e "console.log(\'ecc-keyless-ok\')"', timeoutMs: 30000 },
+  ]);
   const home = path.join(tempRoot, 'home');
-  const project = path.join(tempRoot, 'project');
-  fs.mkdirSync(project, { recursive: true });
-  fs.mkdirSync(path.join(project, '.ecc'), { recursive: true });
-  fs.writeFileSync(path.join(project, '.ecc', 'dsh-verify.json'), JSON.stringify({
-    checks: [
-      { name: 'keyless', command: 'node -e "console.log(\'ecc-keyless-ok\')"', timeoutMs: 30000 },
-    ],
-  }, null, 2));
-
-  const install = spawnSync(process.execPath, [
-    path.join(ROOT, 'scripts', 'dsh-install.js'),
-    '--dsh-home', home,
-  ], { encoding: 'utf8' });
-  if (install.status !== 0) {
-    throw new Error(`preset install failed: ${install.stderr}`);
-  }
+  installDshPreset(home);
 
   const port = await reservePort();
   const baseUrl = `http://127.0.0.1:${port}`;
-  let child = spawnWeb({ port, home, mockUrl: mock.url });
+  let child = spawnDshWeb({
+    port,
+    home,
+    extraEnv: {
+      DEEPSEEK_BASE_URL: mock.url,
+      DEEPSEEK_API_KEY: 'test-key',
+    },
+  });
 
   try {
     await waitForApi(baseUrl, 30000);
@@ -649,8 +521,15 @@ async function main() {
 
     // Cold resume: stop the web process, boot a new one over the same durable
     // $DSH_HOME, and submit a follow-up to the same session id.
-    await stopWeb(child, port);
-    child = spawnWeb({ port, home, mockUrl: mock.url });
+    await stopDshWeb(child, port);
+    child = spawnDshWeb({
+      port,
+      home,
+      extraEnv: {
+        DEEPSEEK_BASE_URL: mock.url,
+        DEEPSEEK_API_KEY: 'test-key',
+      },
+    });
     await waitForApi(baseUrl, 30000);
     await rpc(baseUrl, 'e2e-resume-prompt', 'session.prompt', {
       sessionId,
@@ -750,6 +629,30 @@ async function main() {
       throw new Error(`plan review was not answered; stats: ${JSON.stringify(planAnswerStats)}`);
     }
 
+    // Build mission: the mock model drives a REAL shell write through DSH's
+    // bash tool, then ecc_verify runs a real check against that artifact.
+    await rpc(baseUrl, 'e2e-build-prompt', 'session.prompt', {
+      sessionId,
+      mode: 'queue',
+      content: [{ type: 'text', text: 'BUILD_MISSION: create the artifact and verify it.' }],
+    });
+    const buildHistory = await waitForTurnEnd(baseUrl, sessionId, parsed.timeoutMs);
+    const buildEvents = (buildHistory.events ?? []).map(item => item.event ?? item);
+    const buildArtifact = path.join(project, 'artifact.txt');
+    if (!fs.existsSync(buildArtifact) || fs.readFileSync(buildArtifact, 'utf8').trim() !== 'built-ok') {
+      throw new Error('build mission did not produce artifact.txt with built-ok');
+    }
+    if (!buildEvents.some(event => event.type === 'tool/call' && event.data?.name === 'bash')) {
+      throw new Error('build mission did not log a real bash tool call');
+    }
+    if (!buildEvents.some(event => (
+      event.type === 'goal/change'
+      && event.data?.operation === 'complete'
+      && event.data?.goal?.objective === 'Build ECC mission'
+    ))) {
+      throw new Error('build mission goal was not completed');
+    }
+
     console.log('DeepSeek Harness keyless lifecycle: PASS');
     console.log(`- mock requests: ${mock.state.requests.length}`);
     console.log(`- tool calls logged: ${toolCallNames.join(', ')}`);
@@ -762,9 +665,10 @@ async function main() {
     console.log(`- completion gate blocked then repaired: ${updateGoalAttempts} update_goal attempts`);
     console.log(`- plan mode entries: ${activePlanEvents.length}`);
     console.log(`- plan review approvals: ${planAnswerStats.answered}`);
+    console.log(`- build artifact: ${buildArtifact}`);
     console.log(`- final delivery: ${finalText.split('\n').find(line => line.includes('Delivery'))}`);
   } finally {
-    await stopWeb(child, port);
+    await stopDshWeb(child, port);
     await closeServer(mock.server).catch(() => {});
     if (!parsed.keep) fs.rmSync(tempRoot, { recursive: true, force: true });
     else console.log(`kept artifacts under ${tempRoot}`);

@@ -5,9 +5,10 @@
  * without DSH skip it; local machines with DSH exercise the complete
  * create_goal -> automatic goal round -> subagent review -> workflow fan-out
  * -> ecc_verify -> update_goal complete -> delivery sequence, plus a blocked
- * completion-without-verification repair path and a plan-mode enter ->
- * exit_plan_mode -> approved-plan transition, against a local mock DeepSeek
- * SSE server.
+ * completion-without-verification repair path, a plan-mode enter ->
+ * exit_plan_mode -> approved-plan transition, and a real-bash build mission
+ * whose artifact is checked by ecc_verify, against a local mock DeepSeek SSE
+ * server.
  */
 
 const { execFileSync, spawnSync } = require('child_process');
