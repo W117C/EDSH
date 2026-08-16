@@ -128,3 +128,5 @@ npm run dsh:real-e2e -- --base-url http://127.0.0.1:3080
 The compliance matrix row is `Native`: ECC installs and verifies the surface
 directly, and the real-model acceptance command is operator-gated so the
 repository never embeds credentials.
+
+Acceptance evidence: [acceptance-evidence.md](acceptance-evidence.md)
