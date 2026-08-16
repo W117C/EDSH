@@ -50,6 +50,25 @@ function hasDsh() {
   return checked.status === 0;
 }
 
+function killPortOwners(port) {
+  // dsh web can daemonize its actual server child. This narrows cleanup to
+  // exactly the PIDs listening on the port this script reserved; it never
+  // scans for or signals other dsh processes.
+  const checked = spawnSync('lsof', [
+    '-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t',
+  ], { encoding: 'utf8', timeout: 5000 });
+  if (checked.status !== 0) return;
+  for (const rawPid of checked.stdout.split('\n')) {
+    const pid = Number(rawPid.trim());
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) continue;
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // The listener may have exited between lsof and kill.
+    }
+  }
+}
+
 async function reservePort() {
   return await new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -192,6 +211,8 @@ async function main() {
       new Promise(resolve => child.once('exit', resolve)),
       new Promise(resolve => setTimeout(resolve, 3000)),
     ]);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    killPortOwners(port);
     fs.rmSync(home, { recursive: true, force: true });
   }
 }

@@ -149,8 +149,15 @@ function createMockServer() {
         text = 'WF_OK';
       } else if (userText.includes('PLAN_TEST') && !assistantCalls.includes('ecc_plan')) {
         toolCall = { name: 'ecc_plan', arguments: {} };
+      } else if (userText.includes('PLAN_TEST') && !assistantCalls.includes('exit_plan_mode')) {
+        toolCall = {
+          name: 'exit_plan_mode',
+          arguments: {
+            plan: '# Keyless plan\n\nInspect the repository, verify the gate, and deliver evidence.',
+          },
+        };
       } else if (userText.includes('PLAN_TEST')) {
-        text = 'PLAN_MODE_OK';
+        text = 'PLAN_APPROVED';
       } else if (cheatMode && cheatGoalId === undefined) {
         toolCall = {
           name: 'create_goal',
@@ -340,6 +347,78 @@ async function sleep(ms) {
   return await new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Read the mux SSE stream and answer DSH plan-review questions with Approve.
+ *
+ * @returns answer statistics after the caller aborts the stream.
+ */
+async function answerPlanReviews(baseUrl, sessionId, signal) {
+  const stats = { seen: 0, answered: 0 };
+  const url = new URL('/api/events.mux', baseUrl);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(url);
+
+  const answer = async (rpcId, payload) => {
+    if (payload.sessionId !== sessionId) return;
+    const question = (payload.questions ?? []).find(item => item.intent?.kind === 'plan-review');
+    if (question === undefined) return;
+    stats.seen += 1;
+    const approve = question.intent.approve;
+    const answerResponse = await fetch(`${baseUrl}/api/respond`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'client-response',
+        rpcId,
+        result: {
+          ok: true,
+          value: {
+            sessionId,
+            answer: {
+              answers: [{ id: question.id, selected: [approve] }],
+            },
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const receipt = await answerResponse.json();
+    if (receipt.accepted === true) stats.answered += 1;
+  };
+
+  const answerTasks = [];
+  await new Promise((resolve, reject) => {
+    const abort = () => socket.close();
+    signal.addEventListener('abort', abort, { once: true });
+    socket.addEventListener('open', () => {});
+    socket.addEventListener('message', event => {
+      let envelope;
+      try {
+        envelope = JSON.parse(String(event.data));
+      } catch {
+        return;
+      }
+      if (envelope.type !== 'server-request') return;
+      const payload = envelope.payload;
+      if (payload?.type === 'question/requested') {
+        answerTasks.push(answer(envelope.rpcId, payload));
+      }
+    });
+    socket.addEventListener('close', () => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, { once: true });
+    socket.addEventListener('error', event => {
+      signal.removeEventListener('abort', abort);
+      if (signal.aborted) resolve();
+      else reject(new Error(event.message || 'events.mux WebSocket failed'));
+    }, { once: true });
+  });
+  await Promise.all(answerTasks);
+
+  return stats;
+}
+
 function spawnWeb({ port, home, mockUrl }) {
   return spawn('dsh', ['web', '--host', '127.0.0.1', '--port', String(port)], {
     cwd: ROOT,
@@ -360,7 +439,27 @@ function spawnWeb({ port, home, mockUrl }) {
   });
 }
 
-async function stopWeb(child) {
+function killPortOwners(port) {
+  // dsh web can daemonize its actual server child, so the spawn-tree group
+  // kill above is not sufficient on every platform. This narrows cleanup to
+  // exactly the PIDs listening on the port THIS script reserved; it never
+  // scans for or signals other dsh processes.
+  const checked = spawnSync('lsof', [
+    '-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t',
+  ], { encoding: 'utf8', timeout: 5000 });
+  if (checked.status !== 0) return;
+  for (const rawPid of checked.stdout.split('\n')) {
+    const pid = Number(rawPid.trim());
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) continue;
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // The listener may have exited between lsof and kill.
+    }
+  }
+}
+
+async function stopWeb(child, port) {
   if (!child || child.exitCode !== null) return;
   if (process.platform !== 'win32') {
     try {
@@ -375,6 +474,8 @@ async function stopWeb(child) {
     new Promise(resolve => child.once('exit', resolve)),
     sleep(3000),
   ]);
+  await sleep(300);
+  killPortOwners(port);
 }
 
 function findDeep(data, predicate) {
@@ -548,7 +649,7 @@ async function main() {
 
     // Cold resume: stop the web process, boot a new one over the same durable
     // $DSH_HOME, and submit a follow-up to the same session id.
-    await stopWeb(child);
+    await stopWeb(child, port);
     child = spawnWeb({ port, home, mockUrl: mock.url });
     await waitForApi(baseUrl, 30000);
     await rpc(baseUrl, 'e2e-resume-prompt', 'session.prompt', {
@@ -609,17 +710,26 @@ async function main() {
       throw new Error(`expected one blocked completion plus two successful completions; saw ${updateGoalAttempts}`);
     }
 
-    // Plan-mode scenario: the model calls ecc_plan, the next request must be
-    // assembled under DSH's plan-mode policy, and `plan/mode` must be durable.
+    // Plan-mode scenario: the model enters plan mode with ecc_plan, the next
+    // request is assembled under DSH's plan-mode policy, the model submits
+    // exit_plan_mode, and this harness answers the plan-review question with
+    // Approve over the mux SSE channel.
+    const planAnswerController = new AbortController();
+    const planAnswers = answerPlanReviews(baseUrl, sessionId, planAnswerController.signal);
     await rpc(baseUrl, 'e2e-plan-prompt', 'session.prompt', {
       sessionId,
       mode: 'queue',
       content: [{ type: 'text', text: 'PLAN_TEST: enter plan mode and inspect.' }],
     });
     const planHistory = await waitForTurnEnd(baseUrl, sessionId, parsed.timeoutMs);
+    planAnswerController.abort();
+    const planAnswerStats = await planAnswers;
     const planEvents = (planHistory.events ?? []).map(item => item.event ?? item);
     if (!planEvents.some(event => event.type === 'tool/call' && event.data?.name === 'ecc_plan')) {
       throw new Error('durable log missing ecc_plan tool call');
+    }
+    if (!planEvents.some(event => event.type === 'tool/call' && event.data?.name === 'exit_plan_mode')) {
+      throw new Error('durable log missing exit_plan_mode tool call');
     }
     const activePlanEvents = planEvents.filter(event => (
       event.type === 'plan/mode' && event.data?.active === true
@@ -627,11 +737,17 @@ async function main() {
     if (activePlanEvents.length === 0) {
       throw new Error('durable log missing active plan/mode event');
     }
+    if (!planEvents.some(event => event.type === 'plan/mode' && event.data?.active === false)) {
+      throw new Error('durable log missing plan/mode exit after approval');
+    }
     const planPolicyRequest = mock.state.requests.some(request => (
       JSON.stringify(request.messages ?? []).includes('You are in plan mode')
     ));
     if (!planPolicyRequest) {
       throw new Error('no model request carried the DSH plan-mode policy');
+    }
+    if (planAnswerStats.answered < 1) {
+      throw new Error(`plan review was not answered; stats: ${JSON.stringify(planAnswerStats)}`);
     }
 
     console.log('DeepSeek Harness keyless lifecycle: PASS');
@@ -645,9 +761,10 @@ async function main() {
     console.log(`- cold resume tool calls preserved: ${resumedCalls.join(', ')}`);
     console.log(`- completion gate blocked then repaired: ${updateGoalAttempts} update_goal attempts`);
     console.log(`- plan mode entries: ${activePlanEvents.length}`);
+    console.log(`- plan review approvals: ${planAnswerStats.answered}`);
     console.log(`- final delivery: ${finalText.split('\n').find(line => line.includes('Delivery'))}`);
   } finally {
-    await stopWeb(child);
+    await stopWeb(child, port);
     await closeServer(mock.server).catch(() => {});
     if (!parsed.keep) fs.rmSync(tempRoot, { recursive: true, force: true });
     else console.log(`kept artifacts under ${tempRoot}`);

@@ -83,8 +83,10 @@ The default gate for this repository runs:
   prompt. A second CHEAT scenario tries `update_goal complete` before
   verification: the completion gate blocks it, the mock model repairs by
   running `ecc_verify`, and the retry completes. A third PLAN_TEST scenario
-  calls the model-facing `ecc_plan` tool; the next request carries DSH's
-  plan-mode policy and `plan/mode` lands in the durable session log.
+  calls the model-facing `ecc_plan` tool, verifies that the next request
+  carries DSH's plan-mode policy, submits `exit_plan_mode`, and answers the
+  plan-review question with Approve through DSH's WebSocket mux channel;
+  `plan/mode` active -> inactive lands in the durable session log.
 - Live `dsh web` boot with the installed `ecc` preset: preset discovered in
   `agentPreset.list` and `session.create { agentPreset: 'ecc' }` succeeded
   after the tool schema was corrected to DSH's enforced JSON Schema subset.
@@ -94,15 +96,14 @@ The default gate for this repository runs:
   `ECC_DSH_MCP_CONTEXT7=1`, with `ECC_DSH_MCP_CODEGRAPH=1`, and with both
   enabled together.
 - Process safety: `dsh:smoke` and `dsh:e2e` launch their web servers in a
-  fresh process group and tear down only that group; both were run while a
-  separate user-owned `dsh web` process stayed alive and untouched.
+  fresh process group, then also clean up any daemonized child through the
+  exact reserved listening port; both were run while a separate user-owned
+  `dsh web` process stayed alive and untouched.
 
 ## Next phases
 
-1. Exercise the `exit_plan_mode` approval/rejection path keylessly through
-   DSH's question SSE channel, so plan approval state is also covered.
-2. Real-API smoke with `DEEPSEEK_API_KEY`: one end-to-end task using
+1. Real-API smoke with `DEEPSEEK_API_KEY`: one end-to-end task using
    `create_goal`, plan, execute, `subagent` review, `ecc_verify`, and
    delivery.
-3. Promote the compliance matrix row from Adapter-backed to Native after the
+2. Promote the compliance matrix row from Adapter-backed to Native after the
    end-to-end model smoke passes.
