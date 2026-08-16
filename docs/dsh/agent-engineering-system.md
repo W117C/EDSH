@@ -90,6 +90,9 @@ The default gate for this repository runs:
 - Opt-in MCP rows also mount cleanly: `session.create` succeeds with
   `ECC_DSH_MCP_CONTEXT7=1`, with `ECC_DSH_MCP_CODEGRAPH=1`, and with both
   enabled together.
+- Process safety: `dsh:smoke` and `dsh:e2e` launch their web servers in a
+  fresh process group and tear down only that group; both were run while a
+  separate user-owned `dsh web` process stayed alive and untouched.
 
 ## Next phases
 
