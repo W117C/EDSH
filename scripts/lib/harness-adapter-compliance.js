@@ -316,7 +316,7 @@ const ADAPTER_RECORDS = Object.freeze([
       'project-local and DSH-home skills',
       'DSH plan mode, goal rounds, subagents, and dynamic workflows',
       'repository-owned `ecc_verify` tool',
-      'enforced goal-completion interlock (pre-execute denial without current-goal verification)',
+      'enforced goal-completion interlock (pre-execute denial without current-goal independent review and verification)',
       'opt-in MCP bridges for Context7 and CodeGraph',
       '`/ecc-goal` command',
     ],

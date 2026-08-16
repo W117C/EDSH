@@ -46,6 +46,16 @@ async function loadPlugin() {
   return fake;
 }
 
+function reviewEvent() {
+  return {
+    type: 'user/message',
+    data: {
+      source: { kind: 'subagent-settled', senderSessionId: 'review-child' },
+      content: [{ type: 'text', text: 'Background subagent review-child finished.' }],
+    },
+  };
+}
+
 function verifyPassEvents() {
   return [
     { type: 'tool/call', data: { callId: 'verify-1', name: 'ecc_verify', arguments: '{}' } },
@@ -63,6 +73,7 @@ function verifyPassEvents() {
         },
       },
     },
+    reviewEvent(),
   ];
 }
 
@@ -111,6 +122,28 @@ async function runTests() {
   if (await (async () => {
     const ctx = await loadPlugin();
     const listener = ctx.listeners.get('tools/pre-execute');
+    const foregroundEvents = [
+      { type: 'goal/change', seq: 1, data: { operation: 'create', goal: { id: 'goal-1' } } },
+      { type: 'tool/call', seq: 2, data: { callId: 'verify-1', name: 'ecc_verify', arguments: '{}' } },
+      { type: 'tool/result', seq: 3, data: { message: { source: { callId: 'verify-1' }, content: [{ type: 'tool-result', toolCallId: 'verify-1', isError: false, content: [{ type: 'text', text: '{"ok": true}' }] }] } } },
+      { type: 'tool/call', seq: 4, data: { callId: 'review-1', name: 'subagent', arguments: '{"run_in_background":false}' } },
+      { type: 'tool/result', seq: 5, data: { message: { source: { callId: 'review-1' }, content: [{ type: 'tool-result', toolCallId: 'review-1', isError: false, content: [{ type: 'text', text: 'REVIEW_PASS' }] }] } } },
+    ];
+    const decision = await listener(
+      completionExecution(foregroundEvents),
+      async () => 'accepted',
+    );
+    assert.strictEqual(decision, 'accepted');
+    return true;
+  })().then(ok => test('accepts foreground subagent review evidence', () => assert.ok(ok))).catch(error => {
+    console.log('  \u2717 accepts foreground subagent review evidence');
+    console.log(`    Error: ${error.message}`);
+    return false;
+  })) passed++; else failed++;
+
+  if (await (async () => {
+    const ctx = await loadPlugin();
+    const listener = ctx.listeners.get('tools/pre-execute');
     const decision = await listener(
       completionExecution([]),
       async () => 'accepted',
@@ -127,11 +160,27 @@ async function runTests() {
   if (await (async () => {
     const ctx = await loadPlugin();
     const listener = ctx.listeners.get('tools/pre-execute');
+    const verifyOnly = verifyPassEvents().filter(event => event.type !== 'user/message');
+    const decision = await listener(
+      completionExecution(verifyOnly),
+      async () => 'accepted',
+    );
+    assert.strictEqual(decision.kind, 'deny');
+    assert.ok(decision.reason.includes('independent subagent review'));
+    return true;
+  })().then(ok => test('blocks completion with verification but no independent review', () => assert.ok(ok))).catch(error => {
+    console.log('  \u2717 blocks completion with verification but no independent review');
+    console.log(`    Error: ${error.message}`);
+    return false;
+  })) passed++; else failed++;
+
+  if (await (async () => {
+    const ctx = await loadPlugin();
+    const listener = ctx.listeners.get('tools/pre-execute');
     const events = verifyPassEvents();
     events[1].data.message.content[0].isError = true;
     const decision = await listener(
       completionExecution(events),
-      {},
       async () => 'accepted',
     );
     assert.strictEqual(decision.kind, 'deny');
@@ -158,6 +207,7 @@ async function runTests() {
           },
         },
       },
+      { ...reviewEvent(), seq: 3 },
       { type: 'goal/change', seq: 4, data: { operation: 'create', goal: { id: 'goal-new' } } },
     ];
     const decision = await listener(

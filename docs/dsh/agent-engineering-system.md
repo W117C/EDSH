@@ -34,8 +34,9 @@ lacks:
 2. a repository-owned deterministic verification gate (`ecc_verify` +
    `.ecc/dsh-verify.json`);
 3. an enforced completion interlock (`ecc-completion-gate.mjs`) that blocks
-   `update_goal complete` until the current goal has a passing `ecc_verify`
-   result after its own creation.
+   `update_goal complete` until the current goal has both a settled
+   independent subagent review and a passing `ecc_verify` result after its
+   own creation.
 
 ## Layout
 
@@ -44,7 +45,7 @@ lacks:
 | `.dsh/agent-presets/ecc/agent.cordis.yml` | ECC preset; base rows name-pinned to DSH `standard` 0.1.0-rc.6 |
 | `.dsh/agent-presets/ecc/ecc-lifecycle.mjs` | Phase protocol prompt section and `/ecc-goal` command |
 | `.dsh/agent-presets/ecc/ecc-verify.mjs` | `ecc_verify` tool; model can select only declared checks |
-| `.dsh/agent-presets/ecc/ecc-completion-gate.mjs` | Blocks goal completion without a current-goal `ecc_verify` pass |
+| `.dsh/agent-presets/ecc/ecc-completion-gate.mjs` | Blocks goal completion without a current-goal independent review and `ecc_verify` pass |
 | `.dsh/agent-presets/ecc/ecc-plan-control.mjs` | Model-facing `ecc_plan` entry into DSH plan mode |
 | `.dsh/skills/engineering-lifecycle.md` | Loadable phase-gate skill, discovered by DSH |
 | `.ecc/dsh-verify.json` | The verification commands, reviewed and committed as code |

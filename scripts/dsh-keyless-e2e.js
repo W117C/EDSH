@@ -76,7 +76,9 @@ function createMockServer() {
     verifySeen: false,
     cheatUpdateAttempts: 0,
     cheatVerifyStarted: false,
+    cheatReviewStarted: false,
     buildStep: 0,
+    buildReviewStarted: false,
   };
 
   const server = http.createServer((request, response) => {
@@ -160,7 +162,17 @@ function createMockServer() {
       } else if (buildMode && state.buildStep === 1) {
         toolCall = { name: 'ecc_verify', arguments: {} };
         state.buildStep = 2;
-      } else if (buildMode && state.buildStep === 2 && hasVerifyResult) {
+      } else if (buildMode && state.buildStep === 2 && !state.buildReviewStarted) {
+        toolCall = {
+          name: 'subagent',
+          arguments: {
+            description: 'review build',
+            prompt: 'Adversarially review the build mission artifact.',
+            run_in_background: false,
+          },
+        };
+        state.buildReviewStarted = true;
+      } else if (buildMode && state.buildStep === 2 && state.buildReviewStarted && hasVerifyResult) {
         toolCall = {
           name: 'update_goal',
           arguments: {
@@ -204,7 +216,17 @@ function createMockServer() {
         toolCall = { name: 'ecc_verify', arguments: {} };
         state.cheatVerifyStarted = true;
         state.verifySeen = true;
-      } else if (cheatMode && state.cheatVerifyStarted && state.cheatUpdateAttempts === 1) {
+      } else if (cheatMode && state.cheatVerifyStarted && !state.cheatReviewStarted) {
+        toolCall = {
+          name: 'subagent',
+          arguments: {
+            description: 'review repair',
+            prompt: 'Adversarially review the repaired verification evidence.',
+            run_in_background: false,
+          },
+        };
+        state.cheatReviewStarted = true;
+      } else if (cheatMode && state.cheatReviewStarted && state.cheatUpdateAttempts === 1) {
         toolCall = {
           name: 'update_goal',
           arguments: {
@@ -231,6 +253,7 @@ function createMockServer() {
           arguments: {
             description: 'review verification',
             prompt: 'Adversarially review the verification plan for this keyless mission.',
+            run_in_background: false,
           },
         };
       } else if (hasGoalRound && assistantCalls.includes('subagent') && !assistantCalls.includes('workflow')) {
