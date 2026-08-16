@@ -148,6 +148,9 @@ async function main() {
       ECC_DSH_MCP_CODEGRAPH: '0',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Fresh process group so teardown can never signal the user's own
+    // dsh web instance or any other unrelated dsh process.
+    detached: process.platform !== 'win32',
   });
   child.stdout.resume();
   child.stderr.resume();
@@ -176,7 +179,15 @@ async function main() {
     console.log(`- preset discovered: ${preset.name}`);
     console.log(`- session mounted: ${session.sessionId}`);
   } finally {
-    child.kill('SIGTERM');
+    if (process.platform !== 'win32') {
+      try {
+        process.kill(-child.pid, 'SIGTERM');
+      } catch {
+        child.kill('SIGTERM');
+      }
+    } else {
+      child.kill('SIGTERM');
+    }
     await Promise.race([
       new Promise(resolve => child.once('exit', resolve)),
       new Promise(resolve => setTimeout(resolve, 3000)),

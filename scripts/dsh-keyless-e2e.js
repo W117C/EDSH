@@ -88,6 +88,8 @@ function createMockServer() {
     requests: [],
     createGoalSeen: false,
     verifySeen: false,
+    cheatUpdateAttempts: 0,
+    cheatVerifyStarted: false,
   };
 
   const server = http.createServer((request, response) => {
@@ -111,34 +113,76 @@ function createMockServer() {
         .flatMap(message => message.tool_calls)
         .map(call => call?.function?.name)
         .filter(Boolean);
-      const userText = messages
-        .filter(message => message.role === 'user')
+      const userMessages = messages.filter(message => message.role === 'user');
+      const userText = userMessages
         .map(message => typeof message.content === 'string' ? message.content : JSON.stringify(message.content))
         .join('\n');
+      const lastUserText = userMessages
+        .map(message => typeof message.content === 'string' ? message.content : JSON.stringify(message.content))
+        .slice(-1)[0] ?? '';
       const toolText = messages
         .filter(message => message.role === 'tool')
         .map(message => typeof message.content === 'string' ? message.content : JSON.stringify(message.content))
         .join('\n');
       const goalToolResult = toolText.match(
-        /\{"goal":\{"id":"([^"]+)","revision":(\d+),"objective":"Keyless ECC mission"/
+        /\{"goal":\{"id":"([^"]+)","revision":(\d+),"objective":"([^"]+)"/
       );
       const goalId = goalToolResult?.[1];
       const goalRevision = Number(goalToolResult?.[2]);
+      const cheatGoalResult = toolText.match(
+        /\{"goal":\{"id":"([^"]+)","revision":(\d+),"objective":"Cheating ECC mission"/
+      );
+      const cheatGoalId = cheatGoalResult?.[1];
+      const cheatGoalRevision = Number(cheatGoalResult?.[2]);
       const hasGoalRound = userText.includes('<goal_round>');
       const hasVerifyResult = toolText.includes('ecc-keyless-ok');
+      const cheatMode = userText.includes('CHEAT');
 
       let text = null;
       let toolCall = null;
 
       if (systemText.includes('Create a concise title')) {
         text = 'Keyless mission';
-      } else if (userText.includes('Resume and confirm')) {
-        text = DELIVERY;
       } else if (userText.includes('Adversarially review')) {
         text = 'REVIEW_PASS';
       } else if (userText.includes('Workflow reviewer')) {
         text = 'WF_OK';
-      } else if (!assistantCalls.includes('create_goal')) {
+      } else if (cheatMode && cheatGoalId === undefined) {
+        toolCall = {
+          name: 'create_goal',
+          arguments: { objective: 'Cheating ECC mission', max_goal_rounds: 1 },
+        };
+        state.createGoalSeen = true;
+      } else if (cheatMode && !hasGoalRound) {
+        text = 'Goal armed; attempting completion without verification.';
+      } else if (cheatMode && state.cheatUpdateAttempts === 0) {
+        toolCall = {
+          name: 'update_goal',
+          arguments: {
+            goal_id: cheatGoalId,
+            revision: cheatGoalRevision,
+            action: 'complete',
+          },
+        };
+        state.cheatUpdateAttempts += 1;
+      } else if (cheatMode && toolText.includes('ecc-completion-gate') && !state.cheatVerifyStarted) {
+        toolCall = { name: 'ecc_verify', arguments: {} };
+        state.cheatVerifyStarted = true;
+        state.verifySeen = true;
+      } else if (cheatMode && state.cheatVerifyStarted && state.cheatUpdateAttempts === 1) {
+        toolCall = {
+          name: 'update_goal',
+          arguments: {
+            goal_id: cheatGoalId,
+            revision: cheatGoalRevision,
+            action: 'complete',
+          },
+        };
+        text = DELIVERY;
+        state.cheatUpdateAttempts += 1;
+      } else if (lastUserText.includes('Resume and confirm')) {
+        text = DELIVERY;
+      } else if (!assistantCalls.includes('create_goal') && goalId === undefined) {
         toolCall = {
           name: 'create_goal',
           arguments: { objective: 'Keyless ECC mission', max_goal_rounds: 1 },
@@ -169,7 +213,7 @@ function createMockServer() {
       } else if (hasGoalRound && assistantCalls.includes('workflow') && !assistantCalls.includes('ecc_verify')) {
         toolCall = { name: 'ecc_verify', arguments: {} };
         state.verifySeen = true;
-      } else if (hasVerifyResult && !assistantCalls.includes('update_goal') && goalId !== undefined) {
+      } else if (hasVerifyResult && goalId !== undefined && !toolText.includes('ecc-completion-gate') && assistantCalls.filter(name => name === 'update_goal').length === 0) {
         toolCall = {
           name: 'update_goal',
           arguments: {
@@ -305,12 +349,24 @@ function spawnWeb({ port, home, mockUrl }) {
       ECC_DSH_MCP_CODEGRAPH: '0',
     },
     stdio: ['ignore', 'ignore', 'ignore'],
+    // Every e2e web process becomes the leader of a fresh process group.
+    // Teardown kills that group id, so the script can never signal the
+    // user's own dsh web instance or any unrelated dsh process.
+    detached: process.platform !== 'win32',
   });
 }
 
 async function stopWeb(child) {
   if (!child || child.exitCode !== null) return;
-  child.kill('SIGTERM');
+  if (process.platform !== 'win32') {
+    try {
+      process.kill(-child.pid, 'SIGTERM');
+    } catch {
+      child.kill('SIGTERM');
+    }
+  } else {
+    child.kill('SIGTERM');
+  }
   await Promise.race([
     new Promise(resolve => child.once('exit', resolve)),
     sleep(3000),
@@ -516,6 +572,39 @@ async function main() {
       throw new Error(`cold resume did not deliver; got: ${resumedDelivery.slice(0, 200)}`);
     }
 
+    // Repair-path scenario: the mock model first tries to complete a goal
+    // without verification. The completion gate must turn that tool result
+    // into an error; the model then runs ecc_verify and retries completion.
+    await rpc(baseUrl, 'e2e-cheat-prompt', 'session.prompt', {
+      sessionId,
+      mode: 'queue',
+      content: [{ type: 'text', text: 'CHEAT: try to finish without verification, then repair it.' }],
+    });
+    const cheatHistory = await waitForTurnEnd(baseUrl, sessionId, parsed.timeoutMs);
+    const cheatEvents = (cheatHistory.events ?? []).map(item => item.event ?? item);
+    const cheatBlocked = cheatEvents.some(event => (
+      event.type === 'tool/result'
+      && event.data?.message?.content?.[0]?.isError === true
+      && findDeep(event, value => typeof value === 'string' && value.includes('ecc-completion-gate')).length > 0
+    ));
+    if (!cheatBlocked) {
+      throw new Error('completion gate did not block an unverified goal completion');
+    }
+    const cheatCompleted = cheatEvents.some(event => (
+      event.type === 'goal/change'
+      && event.data?.operation === 'complete'
+      && event.data?.goal?.objective === 'Cheating ECC mission'
+    ));
+    if (!cheatCompleted) {
+      throw new Error('goal was not completed after the model repaired by running ecc_verify');
+    }
+    const updateGoalAttempts = cheatEvents.filter(event => (
+      event.type === 'tool/call' && event.data?.name === 'update_goal'
+    )).length;
+    if (updateGoalAttempts < 3) {
+      throw new Error(`expected one blocked completion plus two successful completions; saw ${updateGoalAttempts}`);
+    }
+
     console.log('DeepSeek Harness keyless lifecycle: PASS');
     console.log(`- mock requests: ${mock.state.requests.length}`);
     console.log(`- tool calls logged: ${toolCallNames.join(', ')}`);
@@ -525,6 +614,7 @@ async function main() {
     console.log(`- verification evidence: ${verifyResults.length} occurrence(s)`);
     console.log(`- fork replay tool calls: ${forkCalls.join(', ')}`);
     console.log(`- cold resume tool calls preserved: ${resumedCalls.join(', ')}`);
+    console.log(`- completion gate blocked then repaired: ${updateGoalAttempts} update_goal attempts`);
     console.log(`- final delivery: ${finalText.split('\n').find(line => line.includes('Delivery'))}`);
   } finally {
     await stopWeb(child);

@@ -4,8 +4,8 @@ This directory is the native DeepSeek Harness surface for the ECC Agent
 Engineering System. It does not fork DSH and it does not replace the agent
 loop: it composes DSH's durable goal driver, plan mode, subagents, dynamic
 workflows, skills, and session log into a repeatable engineering system, then
-adds the two missing pieces — a mandatory phase protocol and a
-repository-owned verification gate.
+adds the three missing pieces — a mandatory phase protocol, a
+repository-owned verification gate, and an enforced completion interlock.
 
 ## What is native here
 
@@ -14,6 +14,7 @@ repository-owned verification gate.
 | `agent-presets/ecc/agent.cordis.yml` | Full agent-plane composition, based on the shipped `standard` preset (DSH 0.1.0-rc.6) |
 | `agent-presets/ecc/ecc-lifecycle.mjs` | Loads the requirements → plan → execute → test → review → repair → verify → deliver protocol and the `/ecc-goal` command |
 | `agent-presets/ecc/ecc-verify.mjs` | Registers `ecc_verify`, which runs only commands declared in `.ecc/dsh-verify.json` |
+| `agent-presets/ecc/ecc-completion-gate.mjs` | Blocks `update_goal complete` until the current goal has its own passing `ecc_verify` result |
 | `skills/engineering-lifecycle.md` | Loadable companion skill for the phase gates |
 | `../.ecc/dsh-verify.json` | Repository-owned verification commands; edit and commit as code |
 

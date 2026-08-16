@@ -59,6 +59,7 @@ const PINNED_STANDARD_ROWS = Object.freeze([
 const ECC_ROWS = Object.freeze([
   ['ecc-lifecycle', './ecc-lifecycle.mjs'],
   ['ecc-verify', './ecc-verify.mjs'],
+  ['ecc-completion-gate', './ecc-completion-gate.mjs'],
   ['mcp-context7', '@deepseek-ai/dsh-mcp-client'],
   ['mcp-codegraph', '@deepseek-ai/dsh-mcp-client'],
 ]);

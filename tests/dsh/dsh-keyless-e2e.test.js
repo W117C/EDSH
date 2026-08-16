@@ -3,8 +3,10 @@
  *
  * This test runs only when the `dsh` binary is on PATH. CI environments
  * without DSH skip it; local machines with DSH exercise the complete
- * create_goal -> automatic goal round -> ecc_verify -> update_goal complete
- * -> delivery sequence against a local mock DeepSeek SSE server.
+ * create_goal -> automatic goal round -> subagent review -> workflow fan-out
+ * -> ecc_verify -> update_goal complete -> delivery sequence, plus a blocked
+ * completion-without-verification repair path, against a local mock DeepSeek
+ * SSE server.
  */
 
 const { execFileSync, spawnSync } = require('child_process');
@@ -25,10 +27,10 @@ function runTests() {
   try {
     const output = execFileSync(process.execPath, [
       path.join(ROOT, 'scripts', 'dsh-keyless-e2e.js'),
-      '--timeout-ms', '180000',
+      '--timeout-ms', '240000',
     ], {
       encoding: 'utf8',
-      timeout: 240000,
+      timeout: 300000,
     });
     console.log(output);
     console.log('\n1 passed, 0 failed');

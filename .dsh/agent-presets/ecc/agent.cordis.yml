@@ -261,6 +261,11 @@
 - id: ecc-verify
   name: ./ecc-verify.mjs
 
+# Enforced completion interlock: update_goal complete is blocked unless this
+# session already logged a successful ecc_verify result.
+- id: ecc-completion-gate
+  name: ./ecc-completion-gate.mjs
+
 # The `web` service and its search provider stay in the host composition; only
 # the model-facing tool is per-session.
 - id: tool-web

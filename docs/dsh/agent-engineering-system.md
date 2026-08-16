@@ -27,11 +27,15 @@ DSH is fully plugin-composed. It already owns the hard, durable machinery:
 - the MCP client bridge;
 - sandbox policy, approval, compaction, and telemetry.
 
-ECC therefore contributes a thin agent-plane preset plus two pieces DSH lacks:
+ECC therefore contributes a thin agent-plane preset plus three pieces DSH
+lacks:
 
 1. a mandatory phase protocol (`ecc-lifecycle.mjs`);
 2. a repository-owned deterministic verification gate (`ecc_verify` +
-   `.ecc/dsh-verify.json`).
+   `.ecc/dsh-verify.json`);
+3. an enforced completion interlock (`ecc-completion-gate.mjs`) that blocks
+   `update_goal complete` until the current goal has a passing `ecc_verify`
+   result after its own creation.
 
 ## Layout
 
@@ -40,6 +44,7 @@ ECC therefore contributes a thin agent-plane preset plus two pieces DSH lacks:
 | `.dsh/agent-presets/ecc/agent.cordis.yml` | ECC preset; base rows name-pinned to DSH `standard` 0.1.0-rc.6 |
 | `.dsh/agent-presets/ecc/ecc-lifecycle.mjs` | Phase protocol prompt section and `/ecc-goal` command |
 | `.dsh/agent-presets/ecc/ecc-verify.mjs` | `ecc_verify` tool; model can select only declared checks |
+| `.dsh/agent-presets/ecc/ecc-completion-gate.mjs` | Blocks goal completion without a current-goal `ecc_verify` pass |
 | `.dsh/skills/engineering-lifecycle.md` | Loadable phase-gate skill, discovered by DSH |
 | `.ecc/dsh-verify.json` | The verification commands, reviewed and committed as code |
 | `scripts/dsh-validate-preset.js` | Deterministic structural validation |
@@ -74,7 +79,9 @@ The default gate for this repository runs:
   `update_goal complete` -> delivery text. It then asserts `session.fork`
   replay and a cold web-process restart over the same durable `$DSH_HOME`;
   the restarted session still contains every tool call and can take a new
-  prompt.
+  prompt. A second CHEAT scenario tries `update_goal complete` before
+  verification: the completion gate blocks it, the mock model repairs by
+  running `ecc_verify`, and the retry completes.
 - Live `dsh web` boot with the installed `ecc` preset: preset discovered in
   `agentPreset.list` and `session.create { agentPreset: 'ecc' }` succeeded
   after the tool schema was corrected to DSH's enforced JSON Schema subset.
