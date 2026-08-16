@@ -310,18 +310,19 @@ const ADAPTER_RECORDS = Object.freeze([
   {
     id: 'dsh',
     harness: 'DeepSeek Harness',
-    state: 'Adapter-backed',
+    state: 'Native',
     supported_assets: [
       'native agent preset (`.dsh/agent-presets/ecc`)',
       'project-local and DSH-home skills',
       'DSH plan mode, goal rounds, subagents, and dynamic workflows',
       'repository-owned `ecc_verify` tool',
       'enforced goal-completion interlock (pre-execute denial without current-goal independent review and verification)',
+      'model-facing `ecc_plan` entry with `exit_plan_mode` approval',
       'opt-in MCP bridges for Context7 and CodeGraph',
       '`/ecc-goal` command',
     ],
     unsupported_surfaces: [
-      'Full end-to-end model runs are not yet part of the repo test suite (they require DEEPSEEK_API_KEY)',
+      'Real-model acceptance is an operator-run command (`dsh:real-e2e`) because tests never embed or require an API key',
       'DSH is a developer preview; upstream preset rows may change between releases',
     ],
     install_or_onramp: [
@@ -335,7 +336,7 @@ const ADAPTER_RECORDS = Object.freeze([
       '`npm run dsh:drift` (requires the `dsh` binary on PATH)',
       '`npm run dsh:smoke` (requires the `dsh` binary on PATH)',
       '`npm run dsh:e2e` (keyless mock-model lifecycle, requires the `dsh` binary on PATH)',
-      '`npm run dsh:real-e2e` (real DeepSeek model, requires `DEEPSEEK_API_KEY`)',
+      '`npm run dsh:real-e2e` (real DeepSeek model; `DEEPSEEK_API_KEY` or `--base-url <running dsh web>`)',
       '`npm run harness:adapters -- --check`',
     ],
     risk_notes: [

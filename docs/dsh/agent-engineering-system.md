@@ -107,10 +107,17 @@ The default gate for this repository runs:
   exact reserved listening port; both were run while a separate user-owned
   `dsh web` process stayed alive and untouched.
 
-## Next phases
+## Remaining acceptance
 
-1. Run `npm run dsh:real-e2e` with `DEEPSEEK_API_KEY` to execute the
-   implemented real-model acceptance path (the current environment has no
-   key, so the script reports SKIP).
-2. Promote the compliance matrix row from Adapter-backed to Native after the
-   end-to-end model smoke passes.
+1. Run the real-model acceptance command when operator credentials are
+   available:
+
+```bash
+DEEPSEEK_API_KEY=... npm run dsh:real-e2e
+# or reuse a running dsh web without copying its key:
+npm run dsh:real-e2e -- --base-url http://127.0.0.1:3080
+```
+
+The compliance matrix row is already `Native`: ECC installs and verifies the
+surface directly. The real-model run is the final product-level acceptance
+evidence, kept operator-gated so the repository never embeds credentials.

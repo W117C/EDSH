@@ -134,6 +134,7 @@ function runTests() {
     const record = ADAPTER_RECORDS.find(candidate => candidate.id === 'dsh');
     assert.ok(record, 'dsh adapter record must exist');
     assert.strictEqual(record.harness, 'DeepSeek Harness');
+    assert.strictEqual(record.state, 'Native');
     assert.strictEqual(record.last_verified_at, '2026-08-16');
     assert.ok(record.source_docs.includes('.dsh/agent-presets/ecc/agent.cordis.yml'));
     assert.ok(record.verification_commands.some(command => command.includes('dsh:e2e')));
